@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="fr">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Atelier : Clone n°3 de Sophie</title>
+    <link rel="stylesheet" href="atelier.css">
+</head>
+<body>
+    <header class="entete">
+        <div>
+            <h1>🧪 Atelier : Clone n°3 de Sophie</h1>
+            <p class="sous-titre">Simulateur local du widget « Patiente du chat »</p>
+        </div>
+
+        <div class="fichiers">
+            <span id="etat-fichiers" class="etat-fichiers">Chargement…</span>
+            <label class="bascule">
+                <input type="checkbox" id="auto-recharge" checked>
+                <span class="bascule-piste" aria-hidden="true"></span>
+                <span>Recharger à chaque modification</span>
+            </label>
+            <button id="recharger" class="bouton" type="button">Recharger le widget</button>
+        </div>
+    </header>
+
+    <main class="atelier">
+
+        <section class="panneau zone-chat" aria-labelledby="titre-chat">
+            <h2 id="titre-chat">Chat</h2>
+
+            <form id="form-chat" class="form-chat">
+                <label class="champ">
+                    <span>Pseudo</span>
+                    <input id="pseudo" value="Viewer" autocomplete="off">
+                </label>
+                <div class="ligne">
+                    <input id="message" placeholder="Message, ex. !eau, stp" autocomplete="off" aria-label="Message">
+                    <button class="bouton principal" type="submit">Envoyer</button>
+                </div>
+            </form>
+
+            <div class="ligne repetition">
+                <label for="repetition">Envoyer chaque commande</label>
+                <select id="repetition">
+                    <option>1</option>
+                    <option>3</option>
+                    <option>5</option>
+                    <option>10</option>
+                </select>
+                <span>fois</span>
+            </div>
+
+            <h3>Commandes</h3>
+            <p class="aide">Survolez un bouton pour voir ses alias. Tous les alias peuvent être tapés dans le message.</p>
+            <div id="commandes" class="commandes"></div>
+        </section>
+
+        <section class="panneau zone-scene" aria-labelledby="titre-widget">
+            <h2 id="titre-widget">Widget</h2>
+
+            <div class="scene">
+                <iframe id="widget" title="Widget Patiente du chat"></iframe>
+            </div>
+
+            <dl class="resume">
+                <div>
+                    <dt>Statut</dt>
+                    <dd id="resume-statut">—</dd>
+                </div>
+                <div>
+                    <dt>Image</dt>
+                    <dd id="resume-image">—</dd>
+                </div>
+            </dl>
+
+            <div class="temps">
+                <div class="ligne">
+                    <button id="lecture" class="bouton principal" type="button">⏸ Pause</button>
+                    <select id="vitesse" aria-label="Vitesse">
+                        <option value="1">×1</option>
+                        <option value="2">×2</option>
+                        <option value="5">×5</option>
+                        <option value="20">×20</option>
+                        <option value="100">×100</option>
+                    </select>
+                    <button id="tour-1" class="bouton" type="button">+1 tour</button>
+                    <button id="tour-10" class="bouton" type="button">+10 tours</button>
+                </div>
+                <div class="progression" aria-hidden="true">
+                    <div id="progression-barre"></div>
+                </div>
+                <p class="horloge">
+                    <span id="tours">Tour 0</span> ·
+                    <span id="temps-simule">00:00</span> de jeu simulé
+                </p>
+            </div>
+        </section>
+
+        <section class="panneau zone-parametres" aria-labelledby="titre-parametres">
+            <h2 id="titre-parametres">Paramètres</h2>
+
+            <div id="parametres-nombres" class="parametres-nombres"></div>
+            <div id="parametres-etats" class="parametres-etats"></div>
+
+            <h3>Hasard</h3>
+            <div id="hasard" class="segments">
+                <button type="button" data-hasard="normal" aria-pressed="true">Normal</button>
+                <button type="button" data-hasard="toujours" aria-pressed="false">Tout se déclenche</button>
+                <button type="button" data-hasard="jamais" aria-pressed="false">Rien ne se déclenche</button>
+            </div>
+            <p class="aide">
+                Force le résultat de <code>Math.random()</code> : étouffement en mangeant,
+                éruption, poussée de fièvre, arrêt pendant un étouffement.
+            </p>
+
+            <h3>Scénarios</h3>
+            <div id="scenarios" class="scenarios"></div>
+        </section>
+
+        <section class="panneau zone-journal" aria-labelledby="titre-journal">
+            <div class="ligne journal-entete">
+                <h2 id="titre-journal">Journal</h2>
+                <div class="ligne">
+                    <button id="copier-journal" class="bouton" type="button">Copier</button>
+                    <button id="effacer-journal" class="bouton" type="button">Effacer</button>
+                </div>
+            </div>
+            <ol id="journal" class="journal"></ol>
+        </section>
+
+    </main>
+
+    <script src="atelier.js"></script>
+</body>
+</html>
