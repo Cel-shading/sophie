@@ -1,50 +1,63 @@
-<div class="patient-container">
-    <div class="patient-header">
-        <span class="patient-title">🏥 PATIENTE DU CHAT</span>
-        <span id="patient-status" class="patient-status-badge">
-            Au top !
-        </span>
-    </div>
+<div class="hud">
+    <div class="patient-container">
+        <div class="patient-header">
+            <span class="patient-title">Patiente du chat</span>
+        </div>
 
-    <div class="patient-card">
-        <img id="patient-img" src="" alt="État de la patiente">
-    </div>
-
-    <div class="stats-container">
-
-        <div class="stat-group">
-            <div class="stat-label">
-                <span>Santé</span>
-                <span id="hp-val">100%</span>
+        <div class="patient-main">
+            <div class="patient-card">
+                <img id="patient-img" src="" alt="État de la patiente">
+                <span id="patient-status" class="patient-status-badge">Au top !</span>
             </div>
-            <div class="bar-bg">
-                <div id="hp-bar" class="bar-fill hp"></div>
+
+            <div id="thermometer" class="thermometer">
+                <span id="temp-val" class="thermo-value">37.0°C</span>
+                <div class="thermo-body">
+                    <div id="thermo-scale" class="thermo-scale"></div>
+                    <div class="thermo-glass">
+                        <div class="thermo-tube">
+                            <div id="temp-fill" class="thermo-fill"></div>
+                        </div>
+                        <div class="thermo-bulb"></div>
+                    </div>
+                </div>
             </div>
         </div>
 
-        <div class="stat-group">
-            <div class="stat-label">
-                <span>Hydratation</span>
-                <span id="hydro-val">50%</span>
+        <div class="stats-container">
+
+            <div class="stat-group stat-hp">
+                <div class="stat-label">
+                    <span class="stat-name">Santé</span>
+                    <span class="stat-numbers">
+                        <span id="hp-val" class="stat-value">100</span><span class="stat-max">/ 100</span>
+                    </span>
+                </div>
+                <div class="bar">
+                    <div class="bar-bg">
+                        <div id="hp-bar" class="bar-fill hp"></div>
+                    </div>
+                </div>
             </div>
-            <div class="bar-bg">
-                <div id="hydro-bar" class="bar-fill hydro"></div>
+
+            <div class="stat-group stat-hydro">
+                <div class="stat-label">
+                    <span class="stat-name">Hydratation</span>
+                    <span class="stat-numbers">
+                        <span id="hydro-val" class="stat-value">80%</span>
+                    </span>
+                </div>
+                <div class="bar">
+                    <div class="bar-bg">
+                        <div id="hydro-bar" class="bar-fill hydro"></div>
+                    </div>
+                </div>
             </div>
+
         </div>
 
-        <div class="stat-group">
-            <div class="stat-label">
-                <span>Température</span>
-                <span id="temp-val">37.0°C</span>
-            </div>
-            <div class="bar-bg">
-                <div id="temp-bar" class="bar-fill temp"></div>
-            </div>
+        <div id="log-box" class="log-box">
+            <div>Le chat doit prendre soin de la patiente !</div>
         </div>
-
-    </div>
-
-    <div id="log-box" class="log-box">
-        Le chat doit prendre soin de la patiente !
     </div>
 </div>

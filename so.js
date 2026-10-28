@@ -22,6 +22,8 @@ const IMAGES = {
 const HYDRO_MAX = 200;
 const ANASARQUE_SEUIL = 150;
 const ANASARQUE_SORTIE = 120;
+const THERMO_MIN = 35;
+const THERMO_MAX = 42;
 
 // ==========================================
 // ÉTAT DE LA PATIENTE
@@ -169,6 +171,60 @@ function setBar(valueId, barId, value, max = 100) {
   }
 }
 
+function toggleClass(id, className, active) {
+  const element = document.getElementById(id);
+
+  if (element) {
+    element.classList.toggle(className, active);
+  }
+}
+
+// ==========================================
+// THERMOMÈTRE
+// ==========================================
+
+function thermoPosition(temp) {
+  const percentage = ((temp - THERMO_MIN) / (THERMO_MAX - THERMO_MIN)) * 100;
+  return Math.max(0, Math.min(100, percentage));
+}
+
+function buildThermometerScale() {
+  const scale = document.getElementById("thermo-scale");
+  if (!scale) return;
+
+  scale.innerHTML = "";
+
+  for (let temp = THERMO_MIN; temp <= THERMO_MAX; temp += 0.5) {
+    const major = Number.isInteger(temp);
+
+    const tick = document.createElement("div");
+    tick.className = major ? "thermo-tick major" : "thermo-tick";
+    tick.style.bottom = thermoPosition(temp) + "%";
+    scale.appendChild(tick);
+
+    if (major) {
+      const label = document.createElement("span");
+      label.className = "thermo-label";
+      label.textContent = temp;
+      label.style.bottom = thermoPosition(temp) + "%";
+      scale.appendChild(label);
+    }
+  }
+}
+
+function setThermometer(temp) {
+  const valueElement = document.getElementById("temp-val");
+  const fillElement = document.getElementById("temp-fill");
+
+  if (valueElement) {
+    valueElement.textContent = temp.toFixed(1) + "°C";
+  }
+
+  if (fillElement) {
+    fillElement.style.height = thermoPosition(temp) + "%";
+  }
+}
+
 // ==========================================
 // DÉTECTION DE L'ANASARQUE
 // ==========================================
@@ -208,7 +264,7 @@ function updatePatient() {
 
   updateAnasarque();
 
-  setBar("hp-val", "hp-bar", Math.round(state.hp) + "%");
+  setBar("hp-val", "hp-bar", Math.round(state.hp));
 
   // La jauge atteint 100 % visuel à 150 % d'hydratation.
   // La valeur numérique continue d'afficher la vraie valeur.
@@ -219,12 +275,12 @@ function updatePatient() {
     ANASARQUE_SEUIL
   );
 
-  setBar(
-    "temp-val",
-    "temp-bar",
-    state.temp.toFixed(1) + "°C",
-    42
-  );
+  setThermometer(state.temp);
+
+  toggleClass("hp-bar", "critique", state.hp <= 30);
+  toggleClass("hydro-bar", "critique", state.hydro <= 25);
+  toggleClass("hydro-bar", "surcharge", state.anasarque);
+  toggleClass("thermometer", "fievre", state.temp >= 39);
 
   const status = document.getElementById("patient-status");
   const image = document.getElementById("patient-img");
@@ -697,6 +753,7 @@ window.addEventListener("onEventReceived", function (obj) {
 // INITIALISATION
 // ==========================================
 
+buildThermometerScale();
 updatePatient();
 
 if (gameInterval !== null) {
