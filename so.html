@@ -13,7 +13,7 @@
 
                 <div class="lcd-main">
                     <div class="lcd-pet">
-                        <canvas id="patient-sprite" class="lcd-sprite" width="64" height="56"></canvas>
+                        <canvas id="patient-sprite" class="lcd-sprite" width="76" height="68"></canvas>
                         <span class="lcd-zz">Zz</span>
                     </div>
 
@@ -28,8 +28,6 @@
                     <div id="hp-hearts" class="lcd-hearts"></div>
                     <span id="hp-val" class="lcd-small">100</span>
                 </div>
-
-                <canvas id="hp-wave" class="lcd-wave"></canvas>
 
                 <div class="lcd-hydro">
                     <span id="lcd-drop" class="lcd-icon"></span>
@@ -68,13 +66,6 @@
                 <feFuncR type="discrete" tableValues="0.149 0.302 0.541 0.773"/>
                 <feFuncG type="discrete" tableValues="0.2 0.373 0.608 0.831"/>
                 <feFuncB type="discrete" tableValues="0.129 0.235 0.416 0.643"/>
-            </feComponentTransfer>
-        </filter>
-
-        <!-- Pixels allumés ou éteints, sans demi-teinte. -->
-        <filter id="lcd-net" color-interpolation-filters="sRGB">
-            <feComponentTransfer>
-                <feFuncA type="discrete" tableValues="0 1"/>
             </feComponentTransfer>
         </filter>
     </svg>
