@@ -29,7 +29,7 @@ const ANASARQUE_SORTIE = 120;
 
 const state = {
   hp: 100,
-  hydro: 50,
+  hydro: 80,
   temp: 37,
   anasarque: false,
   eruption: false,
@@ -51,14 +51,17 @@ function normalizeCommand(text) {
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .trim()
-    .replace(/[!?.,;:]+$/, "")
-    .split(/\s+/)[0];
+    .split(/\s+/)[0]
+    .replace(/[!?.,;:]+$/, "");
 }
 
 const COMMANDS = {
   eau: [
-    "!eau", "!perfusion", "!perf", "!boire",
-    "!hydrater", "!hydratation"
+    "!eau", "!boire", "!hydrater", "!hydratation"
+  ],
+
+  perfusion: [
+    "!perfusion", "!perf"
   ],
 
   diuretique: [
@@ -257,24 +260,38 @@ function updatePatient() {
     statusClass = "warning";
   }
 
-  // PRIORITÉ 4 : ANASARQUE
+  // PRIORITÉ 4 : ÉTAT CRITIQUE
+  else if (state.hp <= 30) {
+    statusText = "🩺 État critique";
+    imageUrl = IMAGES.DESHYDRATEE;
+    statusClass = "critical";
+  }
+
+  // PRIORITÉ 5 : ANASARQUE
   else if (state.anasarque) {
     statusText = "💧 ANASARQUE";
     imageUrl = IMAGES.ANASARQUE;
     statusClass = "anasarque";
   }
 
-  // PRIORITÉ 5 : HYPERTHERMIE
+  // PRIORITÉ 6 : HYPERTHERMIE
   else if (state.temp >= 39) {
     statusText = "🌡️ HYPERTHERMIE";
     imageUrl = IMAGES.HYPERTHERMIE;
     statusClass = "critical";
   }
 
-  // PRIORITÉ 6 : DÉSHYDRATATION
+  // PRIORITÉ 7 : DÉSHYDRATATION
   else if (state.hydro <= 25) {
     statusText = "💧 DÉSHYDRATATION";
     imageUrl = IMAGES.DESHYDRATEE;
+    statusClass = "warning";
+  }
+
+  // PRIORITÉ 8 : SYMPTÔMES LÉGERS
+  else if (state.eruption) {
+    statusText = "🔴 Éruption cutanée";
+    imageUrl = IMAGES.ERUPTION;
     statusClass = "warning";
   }
 
@@ -284,25 +301,12 @@ function updatePatient() {
     statusClass = "warning";
   }
 
-  // PRIORITÉ 7 : SANTÉ GÉNÉRALE
-  else if (state.hp <= 30) {
-    statusText = "🩺 État critique";
-    imageUrl = IMAGES.ANASARQUE;
-    statusClass = "critical";
-  }
-
-  else if (state.eruption) {
-    statusText = "🔴 Éruption cutanée";
-    imageUrl = IMAGES.ERUPTION;
-    statusClass = "warning";
-  }
-
   else if (state.hp <= 60 || state.temp >= 38) {
     statusText = "🤒 Patiente malade";
 
     imageUrl = state.temp >= 38
       ? IMAGES.HYPERTHERMIE
-      : IMAGES.ANASARQUE;
+      : IMAGES.DESHYDRATEE;
 
     statusClass = "warning";
   }
@@ -354,8 +358,10 @@ function gameTick() {
     state.hydro - (state.sedatee ? 2 : 1)
   );
 
-  // Perte progressive de santé.
-  if (!state.intubee && !state.sedatee) {
+  // Perte progressive de santé, récupération sous intubation.
+  if (state.intubee) {
+    state.hp = Math.min(100, state.hp + 1);
+  } else {
     state.hp = Math.max(0, state.hp - 1);
   }
 
@@ -372,20 +378,26 @@ function gameTick() {
     return;
   }
 
-  if (state.hp <= 0) {
-    triggerArret("La patiente n'a plus de points de vie !");
-    return;
-  }
-
   // Une déshydratation extrême fait perdre des PV.
   if (state.hydro <= 0) {
     state.hp = Math.max(0, state.hp - 3);
+  }
+
+  if (state.hp <= 0) {
+    triggerArret("La patiente n'a plus de points de vie !");
+    return;
   }
 
   // Apparition aléatoire d'une éruption.
   if (!state.eruption && Math.random() < 0.02) {
     state.eruption = true;
     showLog("🔴 Une éruption cutanée apparaît !");
+  }
+
+  // Apparition aléatoire d'une poussée de fièvre.
+  if (state.temp < 38 && Math.random() < 0.03) {
+    state.temp += 2.5;
+    showLog("🌡️ La patiente fait une poussée de fièvre !");
   }
 
   updatePatient();
@@ -472,32 +484,26 @@ window.addEventListener("onEventReceived", function (obj) {
   // 💧 EAU / PERFUSION
   // ========================================
 
-  if (matchesCommand(message, "eau")) {
-    if (state.arret || state.ettouffement || state.intubee) {
-      showLog("🚨 Impossible de faire boire la patiente !");
+  if (matchesCommand(message, "eau") || matchesCommand(message, "perfusion")) {
+    const perfusion = matchesCommand(message, "perfusion");
+
+    if (state.arret) {
+      showLog("🚨 Réanimez la patiente en priorité !");
+    }
+
+    else if (!perfusion && (state.ettouffement || state.intubee)) {
+      showLog("🚨 Impossible de faire boire la patiente ! Utilisez !perfusion");
     }
 
     else {
-      const previousAnasarque = state.anasarque;
-
       state.hydro = Math.min(HYDRO_MAX, state.hydro + 20);
 
       showLog(
         "💧 " + user +
-        " hydrate la patiente : +20 hydratation !"
+        (perfusion ? " pose une perfusion" : " hydrate la patiente") +
+        " : +20 hydratation !"
       );
-
-      updatePatient();
-
-      if (!previousAnasarque && state.anasarque) {
-        showLog("🚨 Trop d'eau ! La patiente passe en ANASARQUE !");
-      }
-
-      return;
     }
-
-    updatePatient();
-    return;
   }
 
   // ========================================
@@ -592,7 +598,7 @@ window.addEventListener("onEventReceived", function (obj) {
 
     else {
       state.sedatee = true;
-      showLog("😴 " + user + " séd ate la patiente !");
+      showLog("😴 " + user + " sédate la patiente !");
     }
   }
 
@@ -647,7 +653,11 @@ window.addEventListener("onEventReceived", function (obj) {
   // ========================================
 
   else if (matchesCommand(message, "heimlich")) {
-    if (!state.ettouffement) {
+    if (state.arret) {
+      showLog("🚨 Réanimez la patiente en priorité !");
+    }
+
+    else if (!state.ettouffement) {
       showLog("ℹ️ La patiente ne s'étouffe pas !");
     }
 
