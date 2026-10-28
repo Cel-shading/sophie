@@ -414,37 +414,11 @@
 
 .stat-group {
     --couleur: var(--vert);
-    position: relative;
-    padding: 0 4px 7px;
+    padding: 0 4px 4px;
 }
 
 .stat-hydro {
     --couleur: var(--bleu);
-}
-
-/* Crochets sous les extrémités de la barre. */
-.stat-group::before,
-.stat-group::after {
-    content: "";
-    position: absolute;
-    bottom: 0;
-    width: 32%;
-    height: 9px;
-    border-bottom: 2px solid rgba(122, 162, 255, 0.6);
-}
-
-.stat-group::before {
-    left: 0;
-    border-left: 2px solid rgba(122, 162, 255, 0.6);
-    transform: skewX(40deg);
-    transform-origin: top left;
-}
-
-.stat-group::after {
-    right: 0;
-    border-right: 2px solid rgba(122, 162, 255, 0.6);
-    transform: skewX(-40deg);
-    transform-origin: top right;
 }
 
 .stat-label {
@@ -497,6 +471,22 @@
     text-shadow: 1px 1px 0 var(--encre);
 }
 
+/* Onde cardiaque de la santé : la couleur est lue par so.js. */
+.hp-wave {
+    display: block;
+    width: 100%;
+    height: 40px;
+    color: var(--vert);
+}
+
+.hp-wave.faible {
+    color: var(--orange);
+}
+
+.hp-wave.critique {
+    color: var(--rouge);
+}
+
 .bar {
     filter: var(--contour) drop-shadow(2px 3px 0 rgba(11, 15, 30, 0.6));
 }
@@ -510,10 +500,10 @@
     clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 100%, 8px 100%);
 }
 
-/* Hydratation : un cran tous les 10 %, la barre est pleine à 150 %. */
+/* Hydratation : un cran tous les 10 % jusqu'à 200 %, grands crans à 50, 100 et 150 %. */
 .stat-hydro .bar-bg {
-    --crans: 15;
-    --majeurs: 3;
+    --crans: 20;
+    --majeurs: 4;
 }
 
 .bar-bg::after {

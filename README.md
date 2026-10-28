@@ -11,7 +11,9 @@ Le widget affiche :
 - une image qui change selon l'état de la patiente ;
 - un thermomètre gradué de 35 à 42 °C, à droite de l'image ;
 - le statut sur un bracelet d'identification (vert, orange, rouge ou bleu) posé sur la photo ;
-- deux barres crantées sur l'écran d'un moniteur de chevet : **Santé** (un cran tous les 10 PV) et **Hydratation** (un cran tous les 10 %, pleine à 150 %). Elles clignotent en rouge quand la valeur est critique, et la barre d'hydratation passe en violet pendant l'anasarque ;
+- l'écran d'un moniteur de chevet avec :
+  - la **Santé** sous forme d'onde cardiaque animée : verte et régulière en bonne santé, orange et plus rapide à 60 PV ou moins, rouge, rapide et irrégulière à 30 PV ou moins, et plate pendant un arrêt cardiaque ;
+  - l'**Hydratation** sous forme de barre crantée (un cran tous les 10 % jusqu'à 200 %, grand cran à 150 % pour le seuil d'anasarque), qui clignote en rouge à 25 % ou moins et passe en violet pendant l'anasarque ;
 - une feuille de soins sur porte-bloc avec les 3 derniers événements.
 
 Le style est celui d'un hôpital cartoon : mur vert menthe, plaque du service avec croix rouge, électrocardiogramme qui défile, photo fixée au sparadrap, contours épais et ombres nettes. Les barres et le thermomètre gardent un style de HUD de jeu vidéo. Les polices [Fredoka](https://fonts.google.com/specimen/Fredoka) et [Barlow Condensed](https://fonts.google.com/specimen/Barlow+Condensed) sont chargées depuis Google Fonts.
@@ -98,7 +100,7 @@ Une patiente intubée ne peut ni manger ni boire : il faut l'hydrater avec `!per
 
 ### Anasarque (surcharge hydrique)
 
-L'anasarque apparaît quand l'hydratation atteint **150 %** et ne disparaît que lorsqu'elle redescend à **120 %** ou moins. La jauge d'hydratation est pleine à 150 %.
+L'anasarque apparaît quand l'hydratation atteint **150 %** et ne disparaît que lorsqu'elle redescend à **120 %** ou moins. La jauge d'hydratation est pleine à 200 %, avec un grand cran à 150 %.
 
 ### Statut affiché
 
@@ -127,6 +129,7 @@ Tout se règle en haut de `so.js` :
 - `HYDRO_MAX` : hydratation maximale (200).
 - `ANASARQUE_SEUIL` / `ANASARQUE_SORTIE` : seuils d'apparition (150) et de disparition (120) de l'anasarque.
 - `THERMO_MIN` / `THERMO_MAX` : graduations basse (35) et haute (42) du thermomètre.
+- `WAVE_SPEED` / `WAVE_GAP` / `WAVE_FADE` : vitesse de l'onde cardiaque (80 px/s), largeur du trou devant le point d'écriture (40 px) et longueur du fondu de l'ancien tracé (15 px).
 - `COMMANDS` : liste des commandes et de leurs alias.
 
 La fréquence de l'évolution automatique est fixée à la fin du fichier : `setInterval(gameTick, 15000)` (en millisecondes).

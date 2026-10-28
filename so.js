@@ -24,6 +24,9 @@ const ANASARQUE_SEUIL = 150;
 const ANASARQUE_SORTIE = 120;
 const THERMO_MIN = 35;
 const THERMO_MAX = 42;
+const WAVE_SPEED = 80;
+const WAVE_GAP = 40;
+const WAVE_FADE = 15;
 
 // ==========================================
 // ÉTAT DE LA PATIENTE
@@ -226,6 +229,221 @@ function setThermometer(temp) {
 }
 
 // ==========================================
+// MONITEUR CARDIAQUE (ONDE DE SANTÉ)
+// ==========================================
+
+// Le tracé est mémorisé par colonnes de WAVE_STEP pixels et redessiné à chaque image.
+const WAVE_STEP = 0.5;
+
+const wave = {
+  canvas: null,
+  ctx: null,
+  points: null,
+  head: 0,
+  pending: 0,
+  beatTime: 0,
+  period: 60 / 70,
+  last: 0,
+  className: null,
+  color: "#2ed573"
+};
+
+function gaussian(t, center, width) {
+  return Math.exp(-((t - center) ** 2) / (2 * width * width));
+}
+
+// Forme d'un battement, t en secondes depuis le début du battement.
+// Le complexe QRS garde sa durée, le reste se resserre quand le cœur accélère.
+function heartbeatShape(t, period) {
+  const k = Math.min(1, period / 0.8);
+  const qrs = 0.22 * k;
+
+  return 0.12 * gaussian(t, qrs - 0.12 * k, 0.025 * k)
+    - 0.15 * gaussian(t, qrs - 0.02, 0.008)
+    + 1.0 * gaussian(t, qrs, 0.012)
+    - 0.3 * gaussian(t, qrs + 0.02, 0.01)
+    + 0.28 * gaussian(t, qrs + 0.2 * k, 0.04 * k);
+}
+
+function waveSettings() {
+  if (state.arret) {
+    return { bpm: 0, amplitude: 0, irregular: false, noise: 0.02 };
+  }
+
+  const health = state.hp / 100;
+
+  return {
+    bpm: 70 + (1 - health) * 90,
+    amplitude: 0.4 + 0.6 * health,
+    irregular: state.hp <= 30,
+    noise: state.hp <= 30 ? 0.06 : 0.015
+  };
+}
+
+function nextPeriod(settings) {
+  const period = 60 / settings.bpm;
+  return settings.irregular
+    ? period * (0.7 + Math.random() * 0.6)
+    : period;
+}
+
+function resizeWave() {
+  const ratio = window.devicePixelRatio || 1;
+  const width = Math.round(wave.canvas.clientWidth * ratio);
+  const height = Math.round(wave.canvas.clientHeight * ratio);
+
+  if (width === wave.canvas.width && height === wave.canvas.height && wave.points) return;
+
+  wave.canvas.width = width;
+  wave.canvas.height = height;
+  wave.ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+  wave.points = new Float32Array(Math.ceil(wave.canvas.clientWidth / WAVE_STEP) + 1).fill(NaN);
+  wave.head = 0;
+}
+
+// Écrit la colonne suivante ; arrivé au bord droit, le tracé repart à gauche.
+function advanceWave(settings, baseline, scale) {
+  wave.head = (wave.head + 1) % wave.points.length;
+  wave.beatTime += WAVE_STEP / WAVE_SPEED;
+
+  if (settings.bpm && wave.beatTime >= wave.period) {
+    wave.beatTime -= wave.period;
+    wave.period = nextPeriod(settings);
+  }
+
+  const beat = settings.bpm
+    ? settings.amplitude * heartbeatShape(wave.beatTime, wave.period)
+    : 0;
+  const noise = (Math.random() - 0.5) * 2 * settings.noise;
+
+  wave.points[wave.head] = baseline - scale * (beat + noise);
+}
+
+// Efface le trou à partir de x (lueur comprise), puis l'ancien tracé en fondu.
+function eraseAhead(x, height) {
+  const solid = Math.max(0, WAVE_GAP + WAVE_STEP - 3);
+  const length = solid + WAVE_FADE;
+  const gradient = wave.ctx.createLinearGradient(x, 0, x + length, 0);
+
+  gradient.addColorStop(0, "rgba(0, 0, 0, 1)");
+  gradient.addColorStop(solid / length, "rgba(0, 0, 0, 1)");
+  gradient.addColorStop(1, "rgba(0, 0, 0, 0)");
+
+  wave.ctx.fillStyle = gradient;
+  wave.ctx.fillRect(x, 0, length, height);
+
+  return length;
+}
+
+function drawWave(now) {
+  requestAnimationFrame(drawWave);
+
+  const elapsed = Math.min((now - wave.last) / 1000, 0.1);
+  wave.last = now;
+
+  resizeWave();
+
+  const ctx = wave.ctx;
+  const width = wave.canvas.clientWidth;
+  const height = wave.canvas.clientHeight;
+  if (!width || !height) return;
+
+  if (wave.canvas.className !== wave.className) {
+    wave.className = wave.canvas.className;
+    wave.color = getComputedStyle(wave.canvas).color;
+  }
+
+  const settings = waveSettings();
+  const baseline = height * 0.72;
+  const scale = height * 0.62;
+
+  wave.pending += WAVE_SPEED * elapsed;
+
+  while (wave.pending >= WAVE_STEP) {
+    wave.pending -= WAVE_STEP;
+    advanceWave(settings, baseline, scale);
+  }
+
+  const points = wave.points;
+  const count = points.length;
+  const gap = Math.round(WAVE_GAP / WAVE_STEP);
+
+  ctx.clearRect(0, 0, width, height);
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+  ctx.strokeStyle = wave.color;
+  ctx.shadowColor = wave.color;
+  ctx.shadowBlur = 6;
+
+  // Du plus ancien au plus récent, en laissant un trou devant le point d'écriture.
+  ctx.beginPath();
+  let drawing = false;
+
+  for (let age = count - 1 - gap; age >= 0; age--) {
+    const column = (wave.head - age + count) % count;
+    const y = points[column];
+
+    if (Number.isNaN(y)) {
+      drawing = false;
+      continue;
+    }
+
+    const x = column * WAVE_STEP;
+
+    if (drawing && column !== 0) {
+      ctx.lineTo(x, y);
+    } else {
+      ctx.moveTo(x, y);
+    }
+
+    drawing = true;
+  }
+
+  ctx.stroke();
+
+  // Trou devant le point d'écriture, avec un bord adouci côté ancien tracé.
+  const eraseStart = wave.head * WAVE_STEP + 3;
+
+  ctx.shadowBlur = 0;
+  ctx.globalCompositeOperation = "destination-out";
+
+  const eraseLength = eraseAhead(eraseStart, height);
+
+  if (eraseStart + eraseLength > count * WAVE_STEP) {
+    eraseAhead(eraseStart - count * WAVE_STEP, height);
+  }
+
+  ctx.globalCompositeOperation = "source-over";
+
+  // Point d'écriture lumineux et flou.
+  const headY = points[wave.head];
+
+  if (!Number.isNaN(headY)) {
+    ctx.fillStyle = wave.color;
+    ctx.shadowBlur = 14;
+    ctx.globalAlpha = 0.85;
+    ctx.beginPath();
+    ctx.arc(wave.head * WAVE_STEP, headY, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+}
+
+function startHeartMonitor() {
+  const canvas = document.getElementById("hp-wave");
+
+  if (!canvas || !canvas.getContext || typeof requestAnimationFrame !== "function") {
+    return;
+  }
+
+  wave.canvas = canvas;
+  wave.ctx = canvas.getContext("2d");
+  wave.last = performance.now();
+  requestAnimationFrame(drawWave);
+}
+
+// ==========================================
 // DÉTECTION DE L'ANASARQUE
 // ==========================================
 
@@ -264,20 +482,23 @@ function updatePatient() {
 
   updateAnasarque();
 
-  setBar("hp-val", "hp-bar", Math.round(state.hp));
+  const hpValue = document.getElementById("hp-val");
 
-  // La jauge atteint 100 % visuel à 150 % d'hydratation.
-  // La valeur numérique continue d'afficher la vraie valeur.
+  if (hpValue) {
+    hpValue.textContent = Math.round(state.hp);
+  }
+
   setBar(
     "hydro-val",
     "hydro-bar",
     Math.round(state.hydro) + "%",
-    ANASARQUE_SEUIL
+    HYDRO_MAX
   );
 
   setThermometer(state.temp);
 
-  toggleClass("hp-bar", "critique", state.hp <= 30);
+  toggleClass("hp-wave", "faible", state.hp <= 60);
+  toggleClass("hp-wave", "critique", state.hp <= 30 || state.arret);
   toggleClass("hydro-bar", "critique", state.hydro <= 25);
   toggleClass("hydro-bar", "surcharge", state.anasarque);
   toggleClass("thermometer", "fievre", state.temp >= 39);
@@ -755,6 +976,7 @@ window.addEventListener("onEventReceived", function (obj) {
 
 buildThermometerScale();
 updatePatient();
+startHeartMonitor();
 
 if (gameInterval !== null) {
   clearInterval(gameInterval);
