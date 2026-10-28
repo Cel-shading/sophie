@@ -1,55 +1,81 @@
 <div class="hud">
-    <div class="patient-container">
-        <div class="patient-header">
-            <span class="patient-title">Patiente du chat</span>
-        </div>
+    <div class="device">
+        <div class="device-plate">Patiente du chat</div>
 
-        <div class="patient-main">
-            <div class="patient-card">
-                <img id="patient-img" src="" alt="État de la patiente">
-                <span id="patient-status" class="patient-status-badge">Au top !</span>
-            </div>
+        <div class="device-bezel">
+            <div id="lcd" class="lcd">
+                <div id="lcd-icons-top" class="lcd-icons"></div>
 
-            <div id="thermometer" class="thermometer">
-                <span id="temp-val" class="thermo-value">37.0°C</span>
-                <div class="thermo-body">
-                    <div id="thermo-scale" class="thermo-scale"></div>
-                    <div class="thermo-glass">
-                        <div class="thermo-tube">
-                            <div id="temp-fill" class="thermo-fill"></div>
-                        </div>
-                        <div class="thermo-bulb"></div>
+                <div class="lcd-status-row">
+                    <span id="patient-status" class="lcd-status">Stable</span>
+                    <span id="lcd-attention" class="lcd-icon lcd-attention"></span>
+                </div>
+
+                <div class="lcd-main">
+                    <div class="lcd-pet">
+                        <canvas id="patient-sprite" class="lcd-sprite" width="64" height="56"></canvas>
+                        <span class="lcd-zz">Zz</span>
+                    </div>
+
+                    <div id="thermometer" class="lcd-thermo">
+                        <div id="thermo-scale" class="lcd-thermo-segments"></div>
+                        <span class="lcd-thermo-bulb"></span>
+                        <span id="temp-val" class="lcd-small">37.0°</span>
                     </div>
                 </div>
+
+                <div class="lcd-vitals">
+                    <div id="hp-hearts" class="lcd-hearts"></div>
+                    <span id="hp-val" class="lcd-small">100</span>
+                </div>
+
+                <canvas id="hp-wave" class="lcd-wave"></canvas>
+
+                <div class="lcd-hydro">
+                    <span id="lcd-drop" class="lcd-icon"></span>
+                    <div id="hydro-cells" class="hydro-cells"></div>
+                    <span id="hydro-val" class="lcd-small">80%</span>
+                </div>
+
+                <div id="log-box" class="lcd-ticker">
+                    <div>Le chat doit prendre soin de la patiente !</div>
+                </div>
+
+                <div id="lcd-icons-bottom" class="lcd-icons"></div>
             </div>
         </div>
 
-        <div class="stats-container">
-
-            <div class="stat-group stat-hp">
-                <div class="stat-label">
-                    <span class="stat-name">Santé</span>
-                    <span class="stat-numbers">
-                        <span id="hp-val" class="stat-value">100</span><span class="stat-max">/ 100</span>
-                    </span>
-                </div>
-                <canvas id="hp-wave" class="hp-wave"></canvas>
-            </div>
-
-            <div class="stat-group stat-hydro">
-                <div class="stat-label">
-                    <span class="stat-name">Hydratation</span>
-                    <span class="stat-numbers">
-                        <span id="hydro-val" class="stat-value">80%</span>
-                    </span>
-                </div>
-                <div id="hydro-cells" class="hydro-cells"></div>
-            </div>
-
-        </div>
-
-        <div id="log-box" class="log-box">
-            <div>Le chat doit prendre soin de la patiente !</div>
+        <div id="device-buttons" class="device-buttons" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
         </div>
     </div>
+
+    <!-- Image source de la patiente : so.js la redessine en pixels sur l'écran. -->
+    <img id="patient-img" src="" alt="" hidden>
+
+    <svg class="lcd-filters" width="0" height="0" aria-hidden="true">
+        <!-- Ramène l'image aux 4 teintes de l'écran LCD. -->
+        <filter id="lcd-palette" color-interpolation-filters="sRGB">
+            <feColorMatrix type="matrix" values="0.3 0.59 0.11 0 0  0.3 0.59 0.11 0 0  0.3 0.59 0.11 0 0  0 0 0 1 0"/>
+            <feComponentTransfer>
+                <feFuncR type="linear" slope="1.35" intercept="-0.12"/>
+                <feFuncG type="linear" slope="1.35" intercept="-0.12"/>
+                <feFuncB type="linear" slope="1.35" intercept="-0.12"/>
+            </feComponentTransfer>
+            <feComponentTransfer>
+                <feFuncR type="discrete" tableValues="0.149 0.302 0.541 0.773"/>
+                <feFuncG type="discrete" tableValues="0.2 0.373 0.608 0.831"/>
+                <feFuncB type="discrete" tableValues="0.129 0.235 0.416 0.643"/>
+            </feComponentTransfer>
+        </filter>
+
+        <!-- Pixels allumés ou éteints, sans demi-teinte. -->
+        <filter id="lcd-net" color-interpolation-filters="sRGB">
+            <feComponentTransfer>
+                <feFuncA type="discrete" tableValues="0 1"/>
+            </feComponentTransfer>
+        </filter>
+    </svg>
 </div>

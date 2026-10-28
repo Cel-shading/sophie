@@ -1,22 +1,22 @@
 # 🏥 Patiente du chat
 
-Mini-jeu Twitch sous forme de **widget personnalisé StreamElements** : les viewers soignent une patiente virtuelle en tapant des commandes dans le chat. Ils doivent la garder en vie en surveillant sa santé, son hydratation et sa température, et réagir aux urgences (étouffement, arrêt cardiaque…).
+Mini-jeu Twitch façon **animal virtuel de poche**, sous forme de **widget personnalisé StreamElements** : les viewers soignent une patiente virtuelle en tapant des commandes dans le chat. Ils doivent la garder en vie en surveillant sa santé, son hydratation et sa température, et réagir aux urgences (étouffement, arrêt cardiaque…).
 
 <p align="center">
-    <img src="image.png" alt="Aperçu du widget : photo de la patiente, thermomètre, moniteur avec l'onde de santé et les cases d'hydratation, feuille de soins" width="300">
+    <img src="image.png" alt="Aperçu du widget : appareil de poche en forme d'œuf avec un écran LCD montrant la patiente en pixels, ses cœurs, son tracé cardiaque, son hydratation et son thermomètre" width="300">
 </p>
 
-Le widget affiche :
+Le widget est un appareil de poche en forme d'œuf (coque vert menthe, anneau de porte-clés, plaque « Patiente du chat » à croix rouge, trois boutons). Son écran LCD affiche :
 
-- une image qui change selon l'état de la patiente ;
-- un thermomètre gradué de 35 à 42 °C, à droite de l'image ;
-- le statut sur un bracelet d'identification (vert, orange, rouge ou bleu) posé sur la photo ;
-- l'écran d'un moniteur de chevet avec :
-  - la **Santé** sous forme d'onde cardiaque animée : verte et régulière en bonne santé, orange et plus rapide à 60 PV ou moins, rouge, rapide et irrégulière à 30 PV ou moins, et plate pendant un arrêt cardiaque ;
-  - l'**Hydratation** sous forme de 20 cases du quadrillage de l'écran, une par tranche de 10 % jusqu'à 200 %. Les cases allumées sont bleues, rouges et clignotantes à 25 % ou moins, et violettes pendant l'anasarque. Les 5 dernières cases (au-delà de 150 %) restent teintées de violet pour signaler la zone de danger ;
-- une feuille de soins sur porte-bloc avec les 3 derniers événements.
+- la **patiente en pixels**, redessinée automatiquement à partir de l'image de son état. Elle respire, tremble quand elle s'étouffe, dort (« Zz ») sous sédation et ne bouge plus pendant un arrêt cardiaque ;
+- le **statut** en texte, qui clignote quand il est critique, et une icône **attention** qui s'allume quand la patiente a besoin de soins ;
+- un **thermomètre** à segments, un par demi-degré de 35 à 42 °C, qui clignote à 39 °C ou plus ;
+- la **santé** en 5 cœurs (un demi-cœur = 10 PV) avec le nombre de PV, et un **tracé cardiaque** pixelisé : plus rapide et plus faible quand la santé baisse, irrégulier à 30 PV ou moins, plat pendant un arrêt cardiaque ;
+- l'**hydratation** en 20 segments, un par tranche de 10 % jusqu'à 200 %. Les segments au-delà de 150 % (anasarque) sont hachurés quand ils sont éteints. Les segments allumés clignotent à 25 % ou moins et pendant l'anasarque ;
+- le **dernier événement** en texte défilant ;
+- **8 icônes de soins** autour de l'écran : manger, eau, médicaments, crème, Heimlich, intubation, sommeil et réanimation. Elles s'allument quand la patiente en a besoin, clignotent quand c'est urgent et s'affichent en négatif quand un viewer utilise la commande correspondante (le bouton du milieu s'enfonce aussi).
 
-Le style est celui d'un hôpital cartoon : mur vert menthe, plaque du service avec croix rouge, électrocardiogramme qui défile, photo fixée au sparadrap, contours épais et ombres nettes. Le moniteur et le thermomètre gardent un style de HUD de jeu vidéo. Les polices [Fredoka](https://fonts.google.com/specimen/Fredoka) et [Barlow Condensed](https://fonts.google.com/specimen/Barlow+Condensed) sont chargées depuis Google Fonts.
+Les icônes sont dessinées en pixel art dans `so.js`. Les polices [Fredoka](https://fonts.google.com/specimen/Fredoka) et [VT323](https://fonts.google.com/specimen/VT323) sont chargées depuis Google Fonts.
 
 ## Installation dans StreamElements
 
@@ -100,38 +100,61 @@ Une patiente intubée ne peut ni manger ni boire : il faut l'hydrater avec `!per
 
 ### Anasarque (surcharge hydrique)
 
-L'anasarque apparaît quand l'hydratation atteint **150 %** et ne disparaît que lorsqu'elle redescend à **120 %** ou moins. Sur le moniteur, la 15ᵉ case marque ce seuil.
+L'anasarque apparaît quand l'hydratation atteint **150 %** et ne disparaît que lorsqu'elle redescend à **120 %** ou moins. Sur l'écran, les segments au-delà de ce seuil sont hachurés.
 
 ### Statut affiché
 
-Quand plusieurs problèmes se cumulent, le widget affiche le plus grave, dans cet ordre :
+Quand plusieurs problèmes se cumulent, l'écran affiche le plus grave, dans cet ordre. Les statuts critiques clignotent, et l'icône attention s'allume pour tous les statuts sauf « Stable » (elle clignote pour les critiques).
 
-| Priorité | Condition                          | Statut                    | Couleur |
-|----------|------------------------------------|---------------------------|---------|
-| 1        | Arrêt cardiaque                    | 🚨 ARRÊT CARDIAQUE        | Rouge   |
-| 2        | Étouffement                        | 😱 ÉTOUFFEMENT — !heimlich | Rouge   |
-| 3        | Intubée et sédatée                 | 😴 Intubée et sédatée     | Orange  |
-| 3        | Intubée                            | 🫁 Intubée et éveillée    | Orange  |
-| 4        | PV ≤ 30                            | 🩺 État critique          | Rouge   |
-| 5        | Hydratation ≥ 150 %                | 💧 ANASARQUE              | Bleu    |
-| 6        | Température ≥ 39 °C                | 🌡️ HYPERTHERMIE           | Rouge   |
-| 7        | Hydratation ≤ 25 %                 | 💧 DÉSHYDRATATION         | Orange  |
-| 8        | Éruption cutanée                   | 🔴 Éruption cutanée       | Orange  |
-| 8        | Hydratation ≤ 50 %                 | 💧 Déshydratée            | Orange  |
-| 8        | PV ≤ 60 ou température ≥ 38 °C     | 🤒 Patiente malade        | Orange  |
-| —        | Aucun problème                     | Stable                    | Vert    |
+| Priorité | Condition                          | Statut                    | Critique |
+|----------|------------------------------------|---------------------------|----------|
+| 1        | Arrêt cardiaque                    | ARRÊT CARDIAQUE           | Oui      |
+| 2        | Étouffement                        | ÉTOUFFEMENT — !heimlich   | Oui      |
+| 3        | Intubée et sédatée                 | Intubée et sédatée        |          |
+| 3        | Intubée                            | Intubée et éveillée       |          |
+| 4        | PV ≤ 30                            | État critique             | Oui      |
+| 5        | Hydratation ≥ 150 %                | ANASARQUE                 |          |
+| 6        | Température ≥ 39 °C                | HYPERTHERMIE              | Oui      |
+| 7        | Hydratation ≤ 25 %                 | DÉSHYDRATATION            |          |
+| 8        | Éruption cutanée                   | Éruption cutanée          |          |
+| 8        | Hydratation ≤ 50 %                 | Déshydratée               |          |
+| 8        | PV ≤ 60 ou température ≥ 38 °C     | Patiente malade           |          |
+| —        | Aucun problème                     | Stable                    |          |
+
+### Icônes de soins
+
+| Icône        | Commandes                             | Allumée quand…                       | Clignote quand…            |
+|--------------|---------------------------------------|--------------------------------------|----------------------------|
+| Pomme        | `!manger` `!sandwich` `!cacahuetes`   | PV ≤ 60 (et pas intubée)             | PV ≤ 30 (et pas intubée)   |
+| Goutte       | `!eau` `!perfusion`                   | Hydratation ≤ 50 %                   | Hydratation ≤ 25 %         |
+| Gélule       | `!doliprane` `!lasilix`               | Température ≥ 38 °C ou anasarque     | Température ≥ 39 °C        |
+| Crème        | `!creme`                              | Éruption cutanée                     | —                          |
+| Poing        | `!heimlich`                           | Étouffement                          | Étouffement                |
+| Poumons      | `!intuber` `!extuber`                 | Patiente intubée                     | —                          |
+| Lune         | `!hypnovel` `!reveiller`              | Patiente sédatée                     | —                          |
+| Cœur         | `!mace`                               | Arrêt cardiaque                      | Arrêt cardiaque            |
+
+Pendant un arrêt cardiaque, seule l'icône de réanimation s'allume.
 
 ## Personnalisation
 
 Tout se règle en haut de `so.js` :
 
-- `IMAGES` : URL de l'image pour chaque état. Pour changer une image, téléversez-la dans StreamElements et remplacez l'URL.
+- `IMAGES` : URL de l'image pour chaque état. Pour changer une image, téléversez-la dans StreamElements et remplacez l'URL : elle sera redessinée en pixels sur l'écran.
 - `HYDRO_MAX` : hydratation maximale (200).
-- `HYDRO_CASE` : pourcentage d'hydratation représenté par une case du moniteur (10). Avec un autre réglage, il faudra adapter la largeur du moniteur, qui contient 20 cases de 12 px.
+- `HYDRO_CASE` : pourcentage d'hydratation représenté par un segment (10).
 - `ANASARQUE_SEUIL` / `ANASARQUE_SORTIE` : seuils d'apparition (150) et de disparition (120) de l'anasarque.
-- `THERMO_MIN` / `THERMO_MAX` : graduations basse (35) et haute (42) du thermomètre.
-- `WAVE_SPEED` / `WAVE_GAP` / `WAVE_FADE` : vitesse de l'onde cardiaque (80 px/s), largeur du trou devant le point d'écriture (40 px) et longueur du fondu de l'ancien tracé (15 px).
+- `THERMO_MIN` / `THERMO_MAX` : bas (35) et haut (42) du thermomètre.
+- `WAVE_SPEED` / `WAVE_GAP` / `WAVE_FADE` : vitesse du tracé cardiaque (80 px/s), largeur du trou devant le point d'écriture (40 px) et longueur du fondu de l'ancien tracé (15 px).
 - `COMMANDS` : liste des commandes et de leurs alias.
+
+Plus bas dans `so.js` :
+
+- `PIXELS` : dessins en pixel art des icônes et des cœurs (`#` pour un pixel allumé, `.` pour un pixel éteint) ;
+- `LCD_ICONS` : pour chaque icône de soins, ses commandes et les conditions qui l'allument ou la font clignoter ;
+- `SPRITE_WIDTH` / `SPRITE_HEIGHT` : résolution de la patiente en pixels (64 × 56).
+
+Les 4 teintes de l'écran LCD se règlent dans `so.css` (`--lcd-fond`, `--lcd-encre`…) et dans le filtre `lcd-palette` de `so.html`.
 
 La fréquence de l'évolution automatique est fixée à la fin du fichier : `setInterval(gameTick, 15000)` (en millisecondes).
 
@@ -172,7 +195,7 @@ window.dispatchEvent(new CustomEvent("onEventReceived", {
 ## Structure du projet
 
 ```
-so.html   Structure du widget (image, thermomètre, bracelet, moniteur, journal)
+so.html   Structure du widget (coque, écran LCD, filtres de couleur de l'écran)
 so.css    Apparence du widget
 so.js     Logique du jeu, commandes du chat et mise à jour de l'affichage
 atelier/  Simulateur local « Atelier : Clone n°3 de Sophie »

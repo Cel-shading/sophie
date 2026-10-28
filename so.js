@@ -140,12 +140,15 @@ function matchesCommand(message, command) {
 // JOURNAL DES ÉVÉNEMENTS
 // ==========================================
 
+// Le journal défile sur l'écran : plus le message est long, plus il défile longtemps.
 function showLog(message) {
   const log = document.getElementById("log-box");
   if (!log) return;
 
+  const text = lcdText(message);
   const entry = document.createElement("div");
-  entry.textContent = message;
+  entry.textContent = text;
+  entry.style.animationDuration = 4 + text.length * 0.12 + "s";
   log.prepend(entry);
 
   while (log.children.length > 6) {
@@ -154,11 +157,316 @@ function showLog(message) {
 }
 
 // ==========================================
-// BARRES ET AFFICHAGE
+// ÉCRAN LCD
 // ==========================================
 
-// L'hydratation s'affiche en cases de la grille du moniteur,
-// une case par tranche de HYDRO_CASE % entamée.
+// Un écran LCD n'affiche pas d'emoji : on les retire du texte.
+function lcdText(text) {
+  return String(text)
+    .replace(/[\p{Extended_Pictographic}‍️]/gu, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Dessine une icône à partir d'une grille de caractères :
+// "#" pour un pixel, "." pour rien, toute autre lettre pour un groupe de pixels.
+function pixelSvg(rows) {
+  const groups = {};
+
+  rows.forEach((row, y) => {
+    [...row].forEach((char, x) => {
+      if (char === ".") return;
+
+      const name = char === "#" ? "contour" : char;
+      groups[name] = (groups[name] || "") +
+        `<rect x="${x}" y="${y}" width="1.02" height="1.02"/>`;
+    });
+  });
+
+  const content = Object.entries(groups)
+    .map(([name, rects]) => `<g class="px-${name}">${rects}</g>`)
+    .join("");
+
+  return `<svg viewBox="0 0 ${rows[0].length} ${rows.length}" shape-rendering="crispEdges">${content}</svg>`;
+}
+
+const PIXELS = {
+  food: [
+    "....##...",
+    "...#.....",
+    ".##.#.##.",
+    "#########",
+    "#########",
+    "#########",
+    "#########",
+    ".#######.",
+    "..##.##.."
+  ],
+  water: [
+    "....#....",
+    "....#....",
+    "...###...",
+    "..#####..",
+    ".##.####.",
+    ".#.#####.",
+    ".#######.",
+    "..#####..",
+    "...###..."
+  ],
+  medicine: [
+    ".........",
+    ".........",
+    ".#######.",
+    "#...#####",
+    "#...#####",
+    "#...#####",
+    ".#######.",
+    ".........",
+    "........."
+  ],
+  cream: [
+    "...###...",
+    "...###...",
+    "..#####..",
+    ".#.....#.",
+    ".#.###.#.",
+    ".#.###.#.",
+    ".#.....#.",
+    ".#.....#.",
+    "..#####.."
+  ],
+  heimlich: [
+    "..#.#.#..",
+    ".#######.",
+    ".#######.",
+    ".#######.",
+    "##.#####.",
+    "#..#####.",
+    "#..####..",
+    ".######..",
+    "..####..."
+  ],
+  tube: [
+    "....#....",
+    "....#....",
+    ".##.#.##.",
+    "####.####",
+    "####.####",
+    "####.####",
+    "####.####",
+    ".##...##.",
+    "........."
+  ],
+  sleep: [
+    "...###.##",
+    "..##....#",
+    ".##....#.",
+    ".##...##.",
+    ".##......",
+    ".##......",
+    "..##.....",
+    "...###...",
+    "........."
+  ],
+  cpr: [
+    ".##...##.",
+    "#########",
+    "####.####",
+    "###...###",
+    "####.####",
+    ".#######.",
+    "..#####..",
+    "...###...",
+    "....#...."
+  ],
+  attention: [
+    "..#####..",
+    ".#.....#.",
+    "#...#...#",
+    "#...#...#",
+    "#...#...#",
+    "#.......#",
+    "#...#...#",
+    ".#.....#.",
+    "..#####.."
+  ],
+  // Cœur de santé : "g" et "d" sont ses moitiés gauche et droite.
+  heart: [
+    ".##...##.",
+    "#gg#.#dd#",
+    "#gggdddd#",
+    "#gggdddd#",
+    ".#ggddd#.",
+    "..#gdd#..",
+    "...#d#...",
+    "....#...."
+  ]
+};
+
+// Icônes autour de l'écran : allumées quand la patiente en a besoin,
+// clignotantes quand c'est urgent, inversées quand un viewer utilise la commande.
+const LCD_ICONS = [
+  {
+    id: "food", row: "top",
+    commands: ["manger", "sandwich", "cacahuetes"],
+    on: () => state.hp <= 60 && !state.intubee,
+    alert: () => state.hp <= 30 && !state.intubee
+  },
+  {
+    id: "water", row: "top",
+    commands: ["eau", "perfusion"],
+    on: () => state.hydro <= 50,
+    alert: () => state.hydro <= 25
+  },
+  {
+    id: "medicine", row: "top",
+    commands: ["doliprane", "diuretique"],
+    on: () => state.temp >= 38 || state.anasarque,
+    alert: () => state.temp >= 39
+  },
+  {
+    id: "cream", row: "top",
+    commands: ["creme"],
+    on: () => state.eruption,
+    alert: () => false
+  },
+  {
+    id: "heimlich", row: "bottom",
+    commands: ["heimlich"],
+    on: () => state.ettouffement,
+    alert: () => state.ettouffement
+  },
+  {
+    id: "tube", row: "bottom",
+    commands: ["intuber", "extuber"],
+    on: () => state.intubee,
+    alert: () => false
+  },
+  {
+    id: "sleep", row: "bottom",
+    commands: ["sedater", "reveiller"],
+    on: () => state.sedatee,
+    alert: () => false
+  },
+  {
+    id: "cpr", row: "bottom",
+    commands: ["cpr"],
+    on: () => state.arret,
+    alert: () => state.arret
+  }
+];
+
+function buildLcdIcons() {
+  for (const icon of LCD_ICONS) {
+    const row = document.getElementById("lcd-icons-" + icon.row);
+    if (!row) continue;
+
+    const element = document.createElement("span");
+    element.id = "lcd-icon-" + icon.id;
+    element.className = "lcd-icon";
+    element.innerHTML = pixelSvg(PIXELS[icon.id]);
+    row.appendChild(element);
+  }
+
+  const attention = document.getElementById("lcd-attention");
+  if (attention) attention.innerHTML = pixelSvg(PIXELS.attention);
+
+  const drop = document.getElementById("lcd-drop");
+  if (drop) drop.innerHTML = pixelSvg(PIXELS.water);
+}
+
+function updateLcdIcons(statusClass) {
+  for (const icon of LCD_ICONS) {
+    // Pendant un arrêt cardiaque, seule la réanimation compte.
+    const active = !state.arret || icon.id === "cpr";
+
+    toggleClass("lcd-icon-" + icon.id, "on", active && icon.on());
+    toggleClass("lcd-icon-" + icon.id, "alerte", active && icon.alert());
+  }
+
+  toggleClass("lcd-attention", "on", statusClass !== "");
+  toggleClass("lcd-attention", "alerte", statusClass === "critical");
+}
+
+function flashCommandIcon(message) {
+  const icon = LCD_ICONS.find((item) =>
+    item.commands.some((command) => matchesCommand(message, command))
+  );
+
+  if (!icon) return;
+
+  toggleClass("lcd-icon-" + icon.id, "flash", true);
+  toggleClass("device-buttons", "presse", true);
+
+  setTimeout(() => {
+    toggleClass("lcd-icon-" + icon.id, "flash", false);
+    toggleClass("device-buttons", "presse", false);
+  }, 1200);
+}
+
+// Cinq cœurs de 20 PV, avec des demi-cœurs de 10 PV.
+function buildHearts() {
+  const container = document.getElementById("hp-hearts");
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  for (let i = 0; i < 5; i++) {
+    const heart = document.createElement("span");
+    heart.className = "lcd-heart";
+    heart.innerHTML = pixelSvg(PIXELS.heart);
+    container.appendChild(heart);
+  }
+}
+
+function setHearts(hp) {
+  const container = document.getElementById("hp-hearts");
+  const valueElement = document.getElementById("hp-val");
+  const halves = Math.ceil(hp / 10);
+
+  if (valueElement) {
+    valueElement.textContent = Math.round(hp);
+  }
+
+  if (!container) return;
+
+  Array.from(container.children).forEach((heart, index) => {
+    const filled = Math.max(0, Math.min(2, halves - index * 2));
+    heart.classList.toggle("moitie", filled === 1);
+    heart.classList.toggle("plein", filled === 2);
+  });
+}
+
+// La patiente est redessinée en pixels à partir de son image.
+const SPRITE_WIDTH = 64;
+const SPRITE_HEIGHT = 56;
+
+function drawSprite() {
+  const image = document.getElementById("patient-img");
+  const canvas = document.getElementById("patient-sprite");
+  if (!image || !canvas || !canvas.getContext || !image.naturalWidth) return;
+
+  const ctx = canvas.getContext("2d");
+  const cropWidth = image.naturalWidth * 0.8;
+  const cropHeight = Math.min(image.naturalHeight, cropWidth * SPRITE_HEIGHT / SPRITE_WIDTH);
+  const cropX = image.naturalWidth * 0.1;
+  const cropY = Math.min(image.naturalHeight - cropHeight, image.naturalHeight * 0.04);
+
+  canvas.width = SPRITE_WIDTH;
+  canvas.height = SPRITE_HEIGHT;
+  ctx.imageSmoothingQuality = "high";
+  ctx.drawImage(image, cropX, cropY, cropWidth, cropHeight, 0, 0, SPRITE_WIDTH, SPRITE_HEIGHT);
+}
+
+function startSprite() {
+  const image = document.getElementById("patient-img");
+  if (!image || !image.addEventListener) return;
+
+  image.addEventListener("load", drawSprite);
+}
+
+// L'hydratation s'affiche en segments LCD,
+// un segment par tranche de HYDRO_CASE % entamée.
 function buildHydroCells() {
   const container = document.getElementById("hydro-cells");
   if (!container) return;
@@ -203,45 +511,34 @@ function toggleClass(id, className, active) {
 // THERMOMÈTRE
 // ==========================================
 
-function thermoPosition(temp) {
-  const percentage = ((temp - THERMO_MIN) / (THERMO_MAX - THERMO_MIN)) * 100;
-  return Math.max(0, Math.min(100, percentage));
-}
-
+// Un segment par demi-degré, du plus chaud (en haut) au plus froid.
+// Les segments des degrés entiers sont plus larges.
 function buildThermometerScale() {
   const scale = document.getElementById("thermo-scale");
   if (!scale) return;
 
   scale.innerHTML = "";
 
-  for (let temp = THERMO_MIN; temp <= THERMO_MAX; temp += 0.5) {
-    const major = Number.isInteger(temp);
-
-    const tick = document.createElement("div");
-    tick.className = major ? "thermo-tick major" : "thermo-tick";
-    tick.style.bottom = thermoPosition(temp) + "%";
-    scale.appendChild(tick);
-
-    if (major) {
-      const label = document.createElement("span");
-      label.className = "thermo-label";
-      label.textContent = temp;
-      label.style.bottom = thermoPosition(temp) + "%";
-      scale.appendChild(label);
-    }
+  for (let temp = THERMO_MAX; temp > THERMO_MIN; temp -= 0.5) {
+    const segment = document.createElement("span");
+    segment.className = Number.isInteger(temp) ? "thermo-segment major" : "thermo-segment";
+    segment.setAttribute("data-temp", temp);
+    scale.appendChild(segment);
   }
 }
 
 function setThermometer(temp) {
   const valueElement = document.getElementById("temp-val");
-  const fillElement = document.getElementById("temp-fill");
+  const scale = document.getElementById("thermo-scale");
 
   if (valueElement) {
-    valueElement.textContent = temp.toFixed(1) + "°C";
+    valueElement.textContent = temp.toFixed(1) + "°";
   }
 
-  if (fillElement) {
-    fillElement.style.height = thermoPosition(temp) + "%";
+  if (scale) {
+    Array.from(scale.children).forEach((segment) => {
+      segment.classList.toggle("on", Number(segment.getAttribute("data-temp")) <= temp);
+    });
   }
 }
 
@@ -249,8 +546,10 @@ function setThermometer(temp) {
 // MONITEUR CARDIAQUE (ONDE DE SANTÉ)
 // ==========================================
 
-// Le tracé est mémorisé par colonnes de WAVE_STEP pixels et redessiné à chaque image.
+// Le tracé est mémorisé par colonnes de WAVE_STEP pixels et redessiné à chaque image,
+// en basse résolution (un pixel LCD = LCD_PIXEL pixels à l'écran).
 const WAVE_STEP = 0.5;
+const LCD_PIXEL = 2;
 
 const wave = {
   canvas: null,
@@ -262,7 +561,7 @@ const wave = {
   period: 60 / 70,
   last: 0,
   className: null,
-  color: "#2ed573"
+  color: "#263321"
 };
 
 function gaussian(t, center, width) {
@@ -305,7 +604,7 @@ function nextPeriod(settings) {
 }
 
 function resizeWave() {
-  const ratio = window.devicePixelRatio || 1;
+  const ratio = 1 / LCD_PIXEL;
   const width = Math.round(wave.canvas.clientWidth * ratio);
   const height = Math.round(wave.canvas.clientHeight * ratio);
 
@@ -386,12 +685,10 @@ function drawWave(now) {
   const gap = Math.round(WAVE_GAP / WAVE_STEP);
 
   ctx.clearRect(0, 0, width, height);
-  ctx.lineWidth = 2.5;
+  ctx.lineWidth = 2;
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
   ctx.strokeStyle = wave.color;
-  ctx.shadowColor = wave.color;
-  ctx.shadowBlur = 6;
 
   // Du plus ancien au plus récent, en laissant un trou devant le point d'écriture.
   ctx.beginPath();
@@ -422,7 +719,6 @@ function drawWave(now) {
   // Trou devant le point d'écriture, avec un bord adouci côté ancien tracé.
   const eraseStart = wave.head * WAVE_STEP + 3;
 
-  ctx.shadowBlur = 0;
   ctx.globalCompositeOperation = "destination-out";
 
   const eraseLength = eraseAhead(eraseStart, height);
@@ -433,17 +729,14 @@ function drawWave(now) {
 
   ctx.globalCompositeOperation = "source-over";
 
-  // Point d'écriture lumineux et flou.
+  // Point d'écriture.
   const headY = points[wave.head];
 
   if (!Number.isNaN(headY)) {
     ctx.fillStyle = wave.color;
-    ctx.shadowBlur = 14;
-    ctx.globalAlpha = 0.85;
     ctx.beginPath();
-    ctx.arc(wave.head * WAVE_STEP, headY, 2.5, 0, Math.PI * 2);
+    ctx.arc(wave.head * WAVE_STEP, headY, 2, 0, Math.PI * 2);
     ctx.fill();
-    ctx.globalAlpha = 1;
   }
 }
 
@@ -499,20 +792,17 @@ function updatePatient() {
 
   updateAnasarque();
 
-  const hpValue = document.getElementById("hp-val");
-
-  if (hpValue) {
-    hpValue.textContent = Math.round(state.hp);
-  }
-
+  setHearts(state.hp);
   setHydroCells(state.hydro);
   setThermometer(state.temp);
 
-  toggleClass("hp-wave", "faible", state.hp <= 60);
   toggleClass("hp-wave", "critique", state.hp <= 30 || state.arret);
   toggleClass("hydro-cells", "critique", state.hydro <= 25);
   toggleClass("hydro-cells", "surcharge", state.anasarque);
   toggleClass("thermometer", "fievre", state.temp >= 39);
+  toggleClass("lcd", "arret", state.arret);
+  toggleClass("lcd", "etouffement", state.ettouffement);
+  toggleClass("lcd", "sedatee", state.sedatee);
 
   const status = document.getElementById("patient-status");
   const image = document.getElementById("patient-img");
@@ -600,13 +890,15 @@ function updatePatient() {
   }
 
   if (status) {
-    status.textContent = statusText;
+    status.textContent = lcdText(statusText);
     status.classList.remove("critical", "anasarque", "warning");
 
     if (statusClass) {
       status.classList.add(statusClass);
     }
   }
+
+  updateLcdIcons(statusClass);
 
   if (image && image.getAttribute("src") !== imageUrl) {
     image.src = imageUrl;
@@ -718,6 +1010,8 @@ window.addEventListener("onEventReceived", function (obj) {
     "Un viewer";
 
   if (!message.startsWith("!")) return;
+
+  flashCommandIcon(message);
 
   // ========================================
   // NOURRITURE
@@ -985,8 +1279,11 @@ window.addEventListener("onEventReceived", function (obj) {
 // INITIALISATION
 // ==========================================
 
+buildLcdIcons();
+buildHearts();
 buildThermometerScale();
 buildHydroCells();
+startSprite();
 updatePatient();
 startHeartMonitor();
 
