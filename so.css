@@ -18,17 +18,11 @@
     --texte-doux: #b8c6e3;
     --orange: #ffa502;
     --vert: #2ed573;
-    --vert-clair: #8dffb9;
-    --vert-sombre: #1c9f55;
     --bleu: #1e90ff;
-    --bleu-clair: #8fd0ff;
-    --bleu-sombre: #1565c9;
     --rouge: #ff4757;
     --rouge-clair: #ffa3ab;
     --rouge-sombre: #c7283a;
     --violet: #a55eea;
-    --violet-clair: #dcb8ff;
-    --violet-sombre: #7a3cc0;
     --contour:
         drop-shadow(2px 0 0 var(--encre))
         drop-shadow(-2px 0 0 var(--encre))
@@ -235,7 +229,7 @@
     transform: rotate(38deg);
 }
 
-/* Les barres et le thermomètre gardent leur style HUD. */
+/* Le moniteur et le thermomètre gardent leur style HUD. */
 .thermometer,
 .stats-container {
     font-family: "Barlow Condensed", "Arial Narrow", sans-serif;
@@ -369,20 +363,22 @@
 }
 
 /* ==========================================
-   BARRES CRANTÉES
+   MONITEUR : ONDE CARDIAQUE ET CASES D'HYDRATATION
    ========================================== */
 
-/* Écran du moniteur de chevet, avec sa coque et son voyant. */
+/* Écran du moniteur de chevet, avec sa coque et son voyant.
+   Toutes les hauteurs sont des multiples de 12 px pour que les cases
+   d'hydratation tombent exactement sur le quadrillage. */
 .stats-container {
     position: relative;
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 12px;
     margin: 0 8px;
-    padding: 10px 10px 6px;
+    padding: 12px;
     background:
-        linear-gradient(rgba(61, 220, 151, 0.07) 1px, transparent 1px) 0 0 / 100% 11px,
-        linear-gradient(90deg, rgba(61, 220, 151, 0.07) 1px, transparent 1px) 0 0 / 11px 100%,
+        linear-gradient(rgba(61, 220, 151, 0.07) 1px, transparent 1px) 0 0 / 100% 12px,
+        linear-gradient(90deg, rgba(61, 220, 151, 0.07) 1px, transparent 1px) 0 0 / 12px 100%,
         radial-gradient(circle at 50% 0%, #1b2b45, #0d1626 75%);
     border: 3px solid var(--encre);
     border-radius: 12px;
@@ -414,7 +410,6 @@
 
 .stat-group {
     --couleur: var(--vert);
-    padding: 0 4px 4px;
 }
 
 .stat-hydro {
@@ -424,9 +419,9 @@
 .stat-label {
     display: flex;
     justify-content: space-between;
-    align-items: flex-end;
+    align-items: center;
     gap: 8px;
-    margin-bottom: 4px;
+    height: 24px;
     line-height: 1;
 }
 
@@ -434,7 +429,6 @@
     display: inline-flex;
     align-items: center;
     gap: 7px;
-    padding-bottom: 2px;
     color: var(--texte-doux);
     font-size: 14px;
     font-weight: 700;
@@ -475,7 +469,7 @@
 .hp-wave {
     display: block;
     width: 100%;
-    height: 40px;
+    height: 48px;
     color: var(--vert);
 }
 
@@ -487,74 +481,49 @@
     color: var(--rouge);
 }
 
-.bar {
-    filter: var(--contour) drop-shadow(2px 3px 0 rgba(11, 15, 30, 0.6));
+/* Hydratation : une case de 12 px par tranche de 10 %, de 0 à 200 %.
+   Les cases au-delà du seuil d'anasarque restent teintées de violet. */
+.hydro-cells {
+    --case: var(--bleu);
+    display: flex;
+    height: 12px;
 }
 
-.bar-bg {
-    --crans: 10;
-    --majeurs: 2;
+.hydro-cells.surcharge {
+    --case: var(--violet);
+}
+
+.hydro-cells.critique {
+    --case: var(--rouge);
+    animation: alerte 0.8s steps(2) infinite;
+}
+
+.hydro-cell {
     position: relative;
-    height: 15px;
-    background: linear-gradient(180deg, #2b375a 0 45%, #19223d 45%);
-    clip-path: polygon(0 0, 100% 0, calc(100% - 8px) 100%, 8px 100%);
+    flex: none;
+    width: 12px;
+    height: 12px;
 }
 
-/* Hydratation : un cran tous les 10 % jusqu'à 200 %, grands crans à 50, 100 et 150 %. */
-.stat-hydro .bar-bg {
-    --crans: 20;
-    --majeurs: 4;
-}
-
-.bar-bg::after {
+.hydro-cell::before {
     content: "";
     position: absolute;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    pointer-events: none;
-    background:
-        repeating-linear-gradient(
-            90deg,
-            transparent 0 calc(100% / var(--majeurs) - 3px),
-            var(--encre) calc(100% / var(--majeurs) - 3px) calc(100% / var(--majeurs))
-        ) left bottom / 100% 75% no-repeat,
-        repeating-linear-gradient(
-            90deg,
-            transparent 0 calc(100% / var(--crans) - 2px),
-            rgba(11, 15, 30, 0.8) calc(100% / var(--crans) - 2px) calc(100% / var(--crans))
-        ) left bottom / 100% 42% no-repeat;
+    top: 2px;
+    left: 2px;
+    width: 9px;
+    height: 9px;
+    border-radius: 1.5px;
+    background: rgba(30, 144, 255, 0.1);
+    transition: background-color 0.3s ease, box-shadow 0.3s ease;
 }
 
-.bar-fill {
-    --clair: var(--vert-clair);
-    --base: var(--vert);
-    --sombre: var(--vert-sombre);
-    width: 0;
-    height: 100%;
-    background: linear-gradient(180deg, var(--clair) 0 30%, var(--base) 30% 72%, var(--sombre) 72%);
-    box-shadow: inset -3px 0 0 rgba(255, 255, 255, 0.7);
-    transition: width 0.4s ease;
+.hydro-cell.zone-surcharge::before {
+    background: rgba(165, 94, 234, 0.2);
 }
 
-.bar-fill.hydro {
-    --clair: var(--bleu-clair);
-    --base: var(--bleu);
-    --sombre: var(--bleu-sombre);
-}
-
-.bar-fill.surcharge {
-    --clair: var(--violet-clair);
-    --base: var(--violet);
-    --sombre: var(--violet-sombre);
-}
-
-.bar-fill.critique {
-    --clair: var(--rouge-clair);
-    --base: var(--rouge);
-    --sombre: var(--rouge-sombre);
-    animation: alerte 0.8s steps(2) infinite;
+.hydro-cell.on::before {
+    background: var(--case);
+    box-shadow: 0 0 5px var(--case);
 }
 
 @keyframes alerte {

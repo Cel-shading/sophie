@@ -20,6 +20,7 @@ const IMAGES = {
 // ==========================================
 
 const HYDRO_MAX = 200;
+const HYDRO_CASE = 10;
 const ANASARQUE_SEUIL = 150;
 const ANASARQUE_SORTIE = 120;
 const THERMO_MIN = 35;
@@ -156,21 +157,37 @@ function showLog(message) {
 // BARRES ET AFFICHAGE
 // ==========================================
 
-function setBar(valueId, barId, value, max = 100) {
-  const valueElement = document.getElementById(valueId);
-  const barElement = document.getElementById(barId);
+// L'hydratation s'affiche en cases de la grille du moniteur,
+// une case par tranche de HYDRO_CASE % entamée.
+function buildHydroCells() {
+  const container = document.getElementById("hydro-cells");
+  if (!container) return;
+
+  container.innerHTML = "";
+
+  for (let level = HYDRO_CASE; level <= HYDRO_MAX; level += HYDRO_CASE) {
+    const cell = document.createElement("span");
+    cell.className = level > ANASARQUE_SEUIL
+      ? "hydro-cell zone-surcharge"
+      : "hydro-cell";
+    container.appendChild(cell);
+  }
+}
+
+function setHydroCells(hydro) {
+  const valueElement = document.getElementById("hydro-val");
+  const container = document.getElementById("hydro-cells");
 
   if (valueElement) {
-    valueElement.textContent = value;
+    valueElement.textContent = Math.round(hydro) + "%";
   }
 
-  if (barElement) {
-    const numericValue = parseFloat(value);
-    const percentage = Number.isNaN(numericValue)
-      ? 0
-      : Math.max(0, Math.min(100, (numericValue / max) * 100));
+  if (container) {
+    const lit = Math.ceil(hydro / HYDRO_CASE);
 
-    barElement.style.width = percentage + "%";
+    Array.from(container.children).forEach((cell, index) => {
+      cell.classList.toggle("on", index < lit);
+    });
   }
 }
 
@@ -488,19 +505,13 @@ function updatePatient() {
     hpValue.textContent = Math.round(state.hp);
   }
 
-  setBar(
-    "hydro-val",
-    "hydro-bar",
-    Math.round(state.hydro) + "%",
-    HYDRO_MAX
-  );
-
+  setHydroCells(state.hydro);
   setThermometer(state.temp);
 
   toggleClass("hp-wave", "faible", state.hp <= 60);
   toggleClass("hp-wave", "critique", state.hp <= 30 || state.arret);
-  toggleClass("hydro-bar", "critique", state.hydro <= 25);
-  toggleClass("hydro-bar", "surcharge", state.anasarque);
+  toggleClass("hydro-cells", "critique", state.hydro <= 25);
+  toggleClass("hydro-cells", "surcharge", state.anasarque);
   toggleClass("thermometer", "fievre", state.temp >= 39);
 
   const status = document.getElementById("patient-status");
@@ -975,6 +986,7 @@ window.addEventListener("onEventReceived", function (obj) {
 // ==========================================
 
 buildThermometerScale();
+buildHydroCells();
 updatePatient();
 startHeartMonitor();
 

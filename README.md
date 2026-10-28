@@ -3,7 +3,7 @@
 Mini-jeu Twitch sous forme de **widget personnalisé StreamElements** : les viewers soignent une patiente virtuelle en tapant des commandes dans le chat. Ils doivent la garder en vie en surveillant sa santé, son hydratation et sa température, et réagir aux urgences (étouffement, arrêt cardiaque…).
 
 <p align="center">
-    <img src="image.png" alt="Aperçu du widget : photo de la patiente, thermomètre, moniteur avec les barres Santé et Hydratation, feuille de soins" width="300">
+    <img src="image.png" alt="Aperçu du widget : photo de la patiente, thermomètre, moniteur avec l'onde de santé et les cases d'hydratation, feuille de soins" width="300">
 </p>
 
 Le widget affiche :
@@ -13,10 +13,10 @@ Le widget affiche :
 - le statut sur un bracelet d'identification (vert, orange, rouge ou bleu) posé sur la photo ;
 - l'écran d'un moniteur de chevet avec :
   - la **Santé** sous forme d'onde cardiaque animée : verte et régulière en bonne santé, orange et plus rapide à 60 PV ou moins, rouge, rapide et irrégulière à 30 PV ou moins, et plate pendant un arrêt cardiaque ;
-  - l'**Hydratation** sous forme de barre crantée (un cran tous les 10 % jusqu'à 200 %, grand cran à 150 % pour le seuil d'anasarque), qui clignote en rouge à 25 % ou moins et passe en violet pendant l'anasarque ;
+  - l'**Hydratation** sous forme de 20 cases du quadrillage de l'écran, une par tranche de 10 % jusqu'à 200 %. Les cases allumées sont bleues, rouges et clignotantes à 25 % ou moins, et violettes pendant l'anasarque. Les 5 dernières cases (au-delà de 150 %) restent teintées de violet pour signaler la zone de danger ;
 - une feuille de soins sur porte-bloc avec les 3 derniers événements.
 
-Le style est celui d'un hôpital cartoon : mur vert menthe, plaque du service avec croix rouge, électrocardiogramme qui défile, photo fixée au sparadrap, contours épais et ombres nettes. Les barres et le thermomètre gardent un style de HUD de jeu vidéo. Les polices [Fredoka](https://fonts.google.com/specimen/Fredoka) et [Barlow Condensed](https://fonts.google.com/specimen/Barlow+Condensed) sont chargées depuis Google Fonts.
+Le style est celui d'un hôpital cartoon : mur vert menthe, plaque du service avec croix rouge, électrocardiogramme qui défile, photo fixée au sparadrap, contours épais et ombres nettes. Le moniteur et le thermomètre gardent un style de HUD de jeu vidéo. Les polices [Fredoka](https://fonts.google.com/specimen/Fredoka) et [Barlow Condensed](https://fonts.google.com/specimen/Barlow+Condensed) sont chargées depuis Google Fonts.
 
 ## Installation dans StreamElements
 
@@ -100,7 +100,7 @@ Une patiente intubée ne peut ni manger ni boire : il faut l'hydrater avec `!per
 
 ### Anasarque (surcharge hydrique)
 
-L'anasarque apparaît quand l'hydratation atteint **150 %** et ne disparaît que lorsqu'elle redescend à **120 %** ou moins. La jauge d'hydratation est pleine à 200 %, avec un grand cran à 150 %.
+L'anasarque apparaît quand l'hydratation atteint **150 %** et ne disparaît que lorsqu'elle redescend à **120 %** ou moins. Sur le moniteur, la 15ᵉ case marque ce seuil.
 
 ### Statut affiché
 
@@ -127,6 +127,7 @@ Tout se règle en haut de `so.js` :
 
 - `IMAGES` : URL de l'image pour chaque état. Pour changer une image, téléversez-la dans StreamElements et remplacez l'URL.
 - `HYDRO_MAX` : hydratation maximale (200).
+- `HYDRO_CASE` : pourcentage d'hydratation représenté par une case du moniteur (10). Avec un autre réglage, il faudra adapter la largeur du moniteur, qui contient 20 cases de 12 px.
 - `ANASARQUE_SEUIL` / `ANASARQUE_SORTIE` : seuils d'apparition (150) et de disparition (120) de l'anasarque.
 - `THERMO_MIN` / `THERMO_MAX` : graduations basse (35) et haute (42) du thermomètre.
 - `WAVE_SPEED` / `WAVE_GAP` / `WAVE_FADE` : vitesse de l'onde cardiaque (80 px/s), largeur du trou devant le point d'écriture (40 px) et longueur du fondu de l'ancien tracé (15 px).
@@ -171,7 +172,7 @@ window.dispatchEvent(new CustomEvent("onEventReceived", {
 ## Structure du projet
 
 ```
-so.html   Structure du widget (image, thermomètre, badge, jauges, journal)
+so.html   Structure du widget (image, thermomètre, bracelet, moniteur, journal)
 so.css    Apparence du widget
 so.js     Logique du jeu, commandes du chat et mise à jour de l'affichage
 atelier/  Simulateur local « Atelier : Clone n°3 de Sophie »
