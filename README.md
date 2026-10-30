@@ -169,7 +169,7 @@ Ouvrez ensuite http://localhost:3003/ (pour changer de port : `PORT=3004 node at
 L'atelier permet de :
 
 - **simuler le chat** : envoyer n'importe quel message sous un pseudo choisi, ou cliquer sur une commande, éventuellement plusieurs fois de suite ;
-- **modifier chaque paramètre** en direct : curseurs pour la santé, l'hydratation et la température, interrupteurs pour l'anasarque, l'éruption, l'étouffement, l'intubation, la sédation et l'arrêt cardiaque ;
+- **modifier chaque paramètre** en direct : curseurs pour la santé, l'hydratation et la température, interrupteurs pour l'anasarque, l'éruption, l'étouffement, l'intubation, la sédation et l'arrêt cardiaque. Comme l'anasarque dépend de l'hydratation, l'activer porte l'hydratation à 150 % et la désactiver la ramène à 120 %, si besoin ;
 - **contrôler le temps** : pause, vitesse ×1 à ×100, avance d'un ou dix tours de 15 secondes ;
 - **forcer le hasard** : tout déclencher (étouffement en mangeant, éruption, fièvre…) ou rien ;
 - **charger un scénario** : intubée à 35 PV, poussée de fièvre, bord de l'anasarque, arrêt cardiaque… ;
