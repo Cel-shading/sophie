@@ -64,7 +64,7 @@ Les commandes ne tiennent pas compte des majuscules, des accents ni de la ponctu
 |--------------|--------------------------------------------------------------------------|------------------------------------------|----------------------------------------------------|
 | `!heimlich`  | `!heimlik` `!claque` `!deboucher` `!desobstruer` `!etouffement` `!etouffe` | Stoppe l'étouffement, +15 PV             | La patiente s'étouffe, pas en arrêt                |
 | `!intuber`   | `!intubation` `!intube` `!intubee` `!tube`                               | Intube la patiente                       | Moins de 40 PV, pas en arrêt ni en étouffement     |
-| `!hypnovel`  | `!sedater` `!sedate` `!sedation` `!endormir` `!dormir` `!hypno`          | Sédate la patiente                       | Patiente intubée                                   |
+| `!hypnovel`  | `!sedater` `!sedate` `!sedation` `!endormir` `!dormir` `!hypno`          | Sédate la patiente : +2 PV par tour, elle n'arrache plus son tube | Patiente intubée                                   |
 | `!reveiller` | `!reveil` `!reveile` `!reveille` `!reveillee` `!stopsedation`            | Arrête la sédation                       | Patiente sédatée                                   |
 | `!extuber`   | `!extubation` `!extube` `!retirertube` `!retirertuyau`                   | Retire le tube                           | Intubée, réveillée, au moins 50 PV                 |
 | `!mace`      | `!cpr` `!massage` `!reanimer` `!reanimation` `!massagecardiaque` `!rcr`  | Met fin à l'arrêt cardiaque              | Patiente en arrêt cardiaque, 3 viewers différents  |
@@ -96,16 +96,31 @@ La 3ᵉ dose de paracétamol en moins de 2 minutes est un **surdosage** : la pat
 
 ### Évolution automatique (toutes les 15 secondes)
 
-- L'hydratation baisse de 1, et de 1 de plus si la patiente est sédatée ou en hyperthermie (39 °C ou plus).
-- La patiente perd 1 PV. Si elle est intubée, elle en regagne 1 à la place.
+- L'hydratation baisse de 1, et de 1 de plus si la patiente est sédatée. En hyperthermie (39 °C ou plus), elle baisse en plus d'autant de points que la fièvre fait perdre de PV (voir l'aggravation ci-dessous).
+- La patiente perd 1 PV. Si elle est intubée, elle en regagne 1 à la place, ou 2 si elle est sédatée.
 - La température revient vers 37 °C de 0,1 °C.
 - En cas d'étouffement, il y a 30 % de risque d'arrêt cardiaque.
-- Chaque problème non soigné lui fait perdre **1 PV de plus** : fièvre (38 °C ou plus), éruption cutanée, anasarque, hydratation à 25 % ou moins. À 0 % d'hydratation, c'est 3 PV au lieu de 1.
+- Intubée mais éveillée, elle a 10 % de risque de s'agiter et d'arracher son tube : elle est extubée et perd 10 PV.
+- Chaque problème non soigné lui fait perdre des PV en plus : fièvre (38 °C ou plus), éruption cutanée, anasarque, hydratation à 25 % ou moins. Voir [Aggravation des problèmes](#aggravation-des-problèmes).
 - À 0 PV, la patiente fait un arrêt cardiaque.
 - Il y a 2 % de chance qu'une éruption cutanée apparaisse.
 - Sous 38 °C, il y a 3 % de chance d'une poussée de fièvre (+2,5 °C).
 
 Pendant un arrêt cardiaque, l'évolution est figée jusqu'à la réanimation ou au décès.
+
+### Aggravation des problèmes
+
+Plus un problème tarde à être soigné, plus il coûte cher. Il fait perdre 1 PV au premier tour, puis 1 PV de plus toutes les 30 secondes (2 tours), jusqu'à **10 PV par tour** :
+
+| Durée sans soin | 15 s | 30 s | 45 s | 1 min | 1 min 15 | … | 2 min 15 | … | 4 min 45 et plus |
+|-----------------|------|------|------|-------|----------|---|----------|---|------------------|
+| PV perdus       | 1    | 1    | 2    | 2     | 3        | … | 5        | … | 10               |
+
+- À 0 % d'hydratation, la déshydratation part de 3 PV au lieu de 1.
+- En hyperthermie (39 °C ou plus), la fièvre fait aussi perdre autant d'hydratation que de PV.
+- Les problèmes se cumulent : une fièvre et une éruption négligées coûtent chacune leur part.
+- Le journal prévient quand un problème atteint 5 puis 10 PV par tour.
+- Dès qu'un problème est soigné, son compteur repart de zéro. Une fièvre ne compte comme soignée que sous 38 °C.
 
 ### Arrêt cardiaque et décès
 
@@ -118,6 +133,8 @@ Le record est gardé par le navigateur de la source OBS. Il repart de zéro si c
 ### Intubation
 
 Une patiente intubée ne peut ni manger ni boire : il faut l'hydrater avec `!perfusion`, qui lui est réservée. Elle regagne 1 PV toutes les 15 secondes et peut être extubée une fois réveillée et remontée à 50 PV.
+
+Éveillée, elle risque à chaque tour d'arracher son tube (10 %, −10 PV). Il vaut donc mieux la sédater avec `!hypnovel` juste après l'intubation : elle ne bouge plus et regagne 2 PV par tour au lieu de 1, mais elle se déshydrate deux fois plus vite. Une fois à 50 PV, `!reveiller` puis `!extuber`.
 
 ### Anasarque (surcharge hydrique)
 
@@ -172,6 +189,8 @@ Tout se règle en haut de `so.js` :
 - `DECES_DUREE` : secondes avant l'arrivée d'une nouvelle patiente (30).
 - `RECHARGES` : recharge de chaque soin, en secondes (nourriture et eau 20, paracétamol et diurétique 30).
 - `SURDOSE_DOSES` / `SURDOSE_FENETRE` / `SURDOSE_PV` : 3 doses de paracétamol en 120 secondes font perdre 10 PV.
+- `AGGRAVATION_TOURS` / `AGGRAVATION_MAX` : un problème non soigné coûte 1 PV de plus tous les 2 tours, jusqu'à 10 PV par tour.
+- `AGITATION_RISQUE` / `AGITATION_PV` : une patiente intubée éveillée a 10 % de risque par tour d'arracher son tube, et perd alors 10 PV.
 - `COMMANDS` : liste des commandes et de leurs alias.
 
 Plus bas dans `so.js` :
@@ -199,7 +218,7 @@ L'atelier permet de :
 - **simuler le chat** : envoyer n'importe quel message sous un pseudo choisi, ou cliquer sur une commande, éventuellement plusieurs fois de suite. Chaque répétition vient d'un viewer différent (Viewer, Viewer 2…), ce qui permet de tester la réanimation à plusieurs ;
 - **modifier chaque paramètre** en direct : curseurs pour la santé, l'hydratation, la température et les secondes restantes pour réanimer, interrupteurs pour l'anasarque, l'éruption, l'étouffement, l'intubation, la sédation, l'arrêt cardiaque et le décès. Comme l'anasarque dépend de l'hydratation, l'activer porte l'hydratation à 150 % et la désactiver la ramène à 120 %, si besoin ;
 - **contrôler le temps** : pause, vitesse ×1 à ×100, avance d'un ou dix tours de 15 secondes. Les recharges et le délai de réanimation suivent ce temps simulé ;
-- **forcer le hasard** : tout déclencher (étouffement en mangeant, éruption, fièvre…) ou rien ;
+- **forcer le hasard** : tout déclencher (étouffement en mangeant, éruption, fièvre, tube arraché…) ou rien ;
 - **charger un scénario** : intubée à 35 PV, poussée de fièvre, bord de l'anasarque, arrêt cardiaque, arrêt à 10 secondes du décès… ;
 - **suivre un journal complet** : messages du chat, messages du widget, changements de statut et erreurs JavaScript avec leur ligne dans `so.js`.
 
