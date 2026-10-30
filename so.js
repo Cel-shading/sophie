@@ -123,7 +123,7 @@ const COMMANDS = {
   ],
 
   cacahuetes: [
-    "!cacahuete", "!cacahuetes", "!cacahouete",
+    "!cacahuetes", "!cacahuete", "!cacahouete",
     "!cacahouetes", "!cacahuette", "!cacahuettes",
     "!arachide", "!arachides", "!peanut", "!peanuts"
   ]
