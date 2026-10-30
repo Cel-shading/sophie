@@ -64,8 +64,8 @@ Les commandes ne tiennent pas compte des majuscules, des accents ni de la ponctu
 |--------------|--------------------------------------------------------------------------|------------------------------------------|----------------------------------------------------|
 | `!heimlich`  | `!heimlik` `!claque` `!deboucher` `!desobstruer` `!etouffement` `!etouffe` | Stoppe l'étouffement, +15 PV             | La patiente s'étouffe, pas en arrêt                |
 | `!intuber`   | `!intubation` `!intube` `!intubee` `!tube`                               | Intube la patiente                       | Moins de 40 PV, pas en arrêt ni en étouffement     |
-| `!hypnovel`  | `!sedater` `!sedate` `!sedation` `!endormir` `!dormir` `!hypno`          | Sédate la patiente : +2 PV par tour, elle n'arrache plus son tube | Patiente intubée                                   |
-| `!reveiller` | `!reveil` `!reveile` `!reveille` `!reveillee` `!stopsedation`            | Arrête la sédation                       | Patiente sédatée                                   |
+| `!hypnovel`  | `!sedater` `!sedate` `!sedation` `!endormir` `!dormir` `!hypno`          | Sédate la patiente : +2 PV par tour, elle n'arrache plus son tube, mais 1 risque sur 5 d'arrêt cardiaque | Patiente intubée                                   |
+| `!reveiller` | `!reveil` `!reveile` `!reveille` `!reveillee` `!stopsedation`            | Arrête la sédation                       | Patiente sédatée depuis au moins 30 s              |
 | `!extuber`   | `!extubation` `!extube` `!retirertube` `!retirertuyau`                   | Retire le tube                           | Intubée, réveillée, au moins 50 PV                 |
 | `!mace`      | `!cpr` `!massage` `!reanimer` `!reanimation` `!massagecardiaque` `!rcr`  | Met fin à l'arrêt cardiaque              | Patiente en arrêt cardiaque, 3 viewers différents  |
 
@@ -81,6 +81,7 @@ Pour éviter le spam, certains soins ont une recharge commune à tout le chat : 
 | Eau         | `!eau` `!perfusion`                   | 20 s     |
 | Paracétamol | `!doliprane`                          | 30 s     |
 | Diurétique  | `!lasilix`                            | 30 s     |
+| Réveil      | `!reveiller`                          | 30 s après chaque `!hypnovel` |
 
 La 3ᵉ dose de paracétamol en moins de 2 minutes est un **surdosage** : la patiente perd 10 PV.
 
@@ -134,7 +135,13 @@ Le record est gardé par le navigateur de la source OBS. Il repart de zéro si c
 
 Une patiente intubée ne peut ni manger ni boire : il faut l'hydrater avec `!perfusion`, qui lui est réservée. Elle regagne 1 PV toutes les 15 secondes et peut être extubée une fois réveillée et remontée à 50 PV.
 
-Éveillée, elle risque à chaque tour d'arracher son tube (10 %, −10 PV). Il vaut donc mieux la sédater avec `!hypnovel` juste après l'intubation : elle ne bouge plus et regagne 2 PV par tour au lieu de 1, mais elle se déshydrate deux fois plus vite. Une fois à 50 PV, `!reveiller` puis `!extuber`.
+Éveillée, elle risque à chaque tour d'arracher son tube (10 %, −10 PV). La sédater avec `!hypnovel` l'en empêche, et elle regagne 2 PV par tour au lieu de 1, mais c'est un pari :
+
+- à chaque `!hypnovel`, il y a **1 risque sur 5** qu'elle réagisse au produit et fasse un arrêt cardiaque ;
+- une fois sédatée, elle ne peut pas être réveillée pendant **30 secondes** ;
+- sédatée, elle se déshydrate deux fois plus vite.
+
+Une fois à 50 PV, `!reveiller` puis `!extuber`.
 
 ### Anasarque (surcharge hydrique)
 
@@ -187,10 +194,11 @@ Tout se règle en haut de `so.js` :
 - `ARRET_DELAI` : secondes laissées au chat pour réanimer la patiente avant le décès (60).
 - `MACE_REQUIS` : nombre de viewers différents qui doivent taper `!mace` (3). Avec 1, un seul suffit.
 - `DECES_DUREE` : secondes avant l'arrivée d'une nouvelle patiente (30).
-- `RECHARGES` : recharge de chaque soin, en secondes (nourriture et eau 20, paracétamol et diurétique 30).
+- `RECHARGES` : recharge de chaque soin, en secondes (nourriture et eau 20, paracétamol et diurétique 30). `reveil` est le délai avant de pouvoir réveiller une patiente qu'on vient de sédater (30).
 - `SURDOSE_DOSES` / `SURDOSE_FENETRE` / `SURDOSE_PV` : 3 doses de paracétamol en 120 secondes font perdre 10 PV.
 - `AGGRAVATION_TOURS` / `AGGRAVATION_MAX` : un problème non soigné coûte 1 PV de plus tous les 2 tours, jusqu'à 10 PV par tour.
 - `AGITATION_RISQUE` / `AGITATION_PV` : une patiente intubée éveillée a 10 % de risque par tour d'arracher son tube, et perd alors 10 PV.
+- `SEDATION_RISQUE` : risque d'arrêt cardiaque à chaque `!hypnovel` (0,2, soit 1 sur 5).
 - `COMMANDS` : liste des commandes et de leurs alias.
 
 Plus bas dans `so.js` :
@@ -218,7 +226,7 @@ L'atelier permet de :
 - **simuler le chat** : envoyer n'importe quel message sous un pseudo choisi, ou cliquer sur une commande, éventuellement plusieurs fois de suite. Chaque répétition vient d'un viewer différent (Viewer, Viewer 2…), ce qui permet de tester la réanimation à plusieurs ;
 - **modifier chaque paramètre** en direct : curseurs pour la santé, l'hydratation, la température et les secondes restantes pour réanimer, interrupteurs pour l'anasarque, l'éruption, l'étouffement, l'intubation, la sédation, l'arrêt cardiaque et le décès. Comme l'anasarque dépend de l'hydratation, l'activer porte l'hydratation à 150 % et la désactiver la ramène à 120 %, si besoin ;
 - **contrôler le temps** : pause, vitesse ×1 à ×100, avance d'un ou dix tours de 15 secondes. Les recharges et le délai de réanimation suivent ce temps simulé ;
-- **forcer le hasard** : tout déclencher (étouffement en mangeant, éruption, fièvre, tube arraché…) ou rien ;
+- **forcer le hasard** : tout déclencher (étouffement en mangeant, éruption, fièvre, tube arraché, arrêt à la sédation…) ou rien ;
 - **charger un scénario** : intubée à 35 PV, poussée de fièvre, bord de l'anasarque, arrêt cardiaque, arrêt à 10 secondes du décès… ;
 - **suivre un journal complet** : messages du chat, messages du widget, changements de statut et erreurs JavaScript avec leur ligne dans `so.js`.
 
