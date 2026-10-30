@@ -16,13 +16,16 @@ const LABELS = {
   ettouffement: "Étouffement",
   intubee: "Intubée",
   sedatee: "Sédatée",
-  arret: "Arrêt cardiaque"
+  arret: "Arrêt cardiaque",
+  delaiArret: "Réanimation (s restantes)",
+  decedee: "Décédée"
 };
 
 const RANGES = {
   hp: { min: 0, max: 100, step: 1 },
   hydro: { min: 0, max: 200, step: 1 },
-  temp: { min: 30, max: 45, step: 0.1 }
+  temp: { min: 30, max: 45, step: 0.1 },
+  delaiArret: { min: 0, max: 60, step: 1 }
 };
 
 const SCENARIOS = [
@@ -36,7 +39,8 @@ const SCENARIOS = [
   { name: "Déshydratation sévère (10 %)", values: { hydro: 10 } },
   { name: "Éruption cutanée", values: { eruption: true } },
   { name: "Étouffement", values: { ettouffement: true } },
-  { name: "Arrêt cardiaque", values: { hp: 0, arret: true } }
+  { name: "Arrêt cardiaque", values: { hp: 0, arret: true } },
+  { name: "Arrêt cardiaque (10 s restantes)", values: { hp: 0, arret: true, delaiArret: 10 } }
 ];
 
 const RANDOM_VALUES = {
@@ -93,6 +97,7 @@ const BRIDGE = `
     hydroMax: read(function () { return HYDRO_MAX; }, 200),
     anasarqueSeuil: read(function () { return ANASARQUE_SEUIL; }, 150),
     anasarqueSortie: read(function () { return ANASARQUE_SORTIE; }, 120),
+    arretDelai: read(function () { return ARRET_DELAI; }, 60),
     update: read(function () { return updatePatient; }, function () {})
   };
   if (parent.atelierReady) parent.atelierReady();
@@ -272,27 +277,46 @@ async function watchFiles() {
 // TEMPS
 // ==========================================
 
-function mainTimer() {
-  return sim.timers.find((timer) => timer.active && timer.delay > 0);
+function activeTimers() {
+  return sim.timers.filter((timer) => timer.active && timer.delay > 0);
 }
 
+// Le tour de jeu est la minuterie la plus longue.
+function mainTimer() {
+  return activeTimers().reduce(
+    (main, timer) => (!main || timer.delay > main.delay ? timer : main),
+    null
+  );
+}
+
+// Les minuteries se déclenchent dans l'ordre chronologique,
+// même quand on avance de plusieurs tours d'un coup.
 function advance(ms) {
   if (!sim.bridge) return;
 
   const main = mainTimer();
+  let left = ms;
 
-  for (const timer of sim.timers) {
-    if (!timer.active || timer.delay <= 0) continue;
+  while (true) {
+    const next = activeTimers().reduce(
+      (soonest, timer) =>
+        !soonest || timer.delay - timer.elapsed < soonest.delay - soonest.elapsed ? timer : soonest,
+      null
+    );
 
-    timer.elapsed += ms;
+    // La marge évite qu'un arrondi empêche un tour de se déclencher.
+    if (!next || next.delay - next.elapsed > left + 1e-6) break;
 
-    while (timer.active && timer.elapsed >= timer.delay) {
-      timer.elapsed -= timer.delay;
-      if (timer === main) sim.ticks++;
-      runTimer(timer);
-    }
+    const step = Math.max(0, next.delay - next.elapsed);
+    for (const timer of activeTimers()) timer.elapsed += step;
+    left -= step;
+
+    next.elapsed = 0;
+    if (next === main) sim.ticks++;
+    runTimer(next);
   }
 
+  for (const timer of activeTimers()) timer.elapsed += left;
   sim.elapsed += ms;
 }
 
@@ -418,6 +442,7 @@ function buildParameters() {
 function numberControl(container, key) {
   const range = { ...(RANGES[key] || { min: 0, max: 100, step: 1 }) };
   if (key === "hydro") range.max = sim.bridge.hydroMax;
+  if (key === "delaiArret") range.max = sim.bridge.arretDelai;
 
   const decimals = range.step < 1 ? 1 : 0;
   const label = LABELS[key] || key;
@@ -544,10 +569,9 @@ function buildScenarios() {
 // CHAT
 // ==========================================
 
-function sendMessage(text) {
+function sendMessage(text, name = $("pseudo").value.trim() || "Viewer") {
   if (!sim.bridge) return;
 
-  const name = $("pseudo").value.trim() || "Viewer";
   log("chat", name + " : " + text);
 
   const event = new sim.win.CustomEvent("onEventReceived", {
@@ -582,9 +606,15 @@ function buildCommands() {
       button.appendChild(more);
     }
 
+    // Chaque répétition vient d'un viewer différent (Viewer, Viewer 2…),
+    // pour tester les soins à plusieurs comme la réanimation.
     button.addEventListener("click", () => {
       const count = Number($("repetition").value);
-      for (let i = 0; i < count; i++) sendMessage(aliases[0]);
+      const name = $("pseudo").value.trim() || "Viewer";
+
+      for (let i = 0; i < count; i++) {
+        sendMessage(aliases[0], i ? name + " " + (i + 1) : name);
+      }
     });
 
     container.appendChild(button);
