@@ -53,7 +53,7 @@ Les commandes ne tiennent pas compte des majuscules, des accents ni de la ponctu
 | Commande     | Alias                                                             | Effet                       | Conditions                                    |
 |--------------|-------------------------------------------------------------------|-----------------------------|-----------------------------------------------|
 | `!eau`       | `!boire` `!hydrater` `!hydratation`                               | +20 hydratation             | Pas en arrêt, pas d'étouffement, pas intubée  |
-| `!perfusion` | `!perf`                                                           | +20 hydratation             | Pas en arrêt (fonctionne même intubée)        |
+| `!perfusion` | `!perf`                                                           | +20 hydratation             | Patiente intubée, pas en arrêt                |
 | `!lasilix`   | `!lasix` `!diuretique` `!diuretik` `!diurese`                     | −20 hydratation             | Pas en arrêt                                  |
 | `!doliprane` | `!doli` `!paracetamol` `!paracetaml`                              | −1,5 °C (pas sous 36 °C)    | Pas en arrêt                                  |
 | `!creme`     | `!cream` `!antihistaminique` `!antihistaminik` `!soignereruption` | Soigne l'éruption cutanée   | Pas en arrêt, éruption présente               |
@@ -67,9 +67,22 @@ Les commandes ne tiennent pas compte des majuscules, des accents ni de la ponctu
 | `!hypnovel`  | `!sedater` `!sedate` `!sedation` `!endormir` `!dormir` `!hypno`          | Sédate la patiente                       | Patiente intubée                                   |
 | `!reveiller` | `!reveil` `!reveile` `!reveille` `!reveillee` `!stopsedation`            | Arrête la sédation                       | Patiente sédatée                                   |
 | `!extuber`   | `!extubation` `!extube` `!retirertube` `!retirertuyau`                   | Retire le tube                           | Intubée, réveillée, au moins 50 PV                 |
-| `!mace`      | `!cpr` `!massage` `!reanimer` `!reanimation` `!massagecardiaque` `!rcr`  | Met fin à l'arrêt cardiaque              | Patiente en arrêt cardiaque                        |
+| `!mace`      | `!cpr` `!massage` `!reanimer` `!reanimation` `!massagecardiaque` `!rcr`  | Met fin à l'arrêt cardiaque              | Patiente en arrêt cardiaque, 3 viewers différents  |
 
-La réanimation stoppe aussi l'étouffement, remonte les PV et l'hydratation à au moins 30, et ramène la température entre 37 et 38 °C.
+La réanimation demande **3 `!mace` de viewers différents** en moins de 60 secondes (un même viewer ne compte qu'une fois), sinon la patiente meurt : voir [Arrêt cardiaque et décès](#arrêt-cardiaque-et-décès). Elle stoppe aussi l'étouffement, remonte les PV et l'hydratation à au moins 30, et ramène la température entre 37 et 38 °C.
+
+### Recharges et surdosage
+
+Pour éviter le spam, certains soins ont une recharge commune à tout le chat : tant qu'elle court, la commande est ignorée. Le premier viewer refusé voit le temps restant dans le journal.
+
+| Soin        | Commandes                             | Recharge |
+|-------------|---------------------------------------|----------|
+| Nourriture  | `!manger` `!sandwich` `!cacahuetes`   | 20 s     |
+| Eau         | `!eau` `!perfusion`                   | 20 s     |
+| Paracétamol | `!doliprane`                          | 30 s     |
+| Diurétique  | `!lasilix`                            | 30 s     |
+
+La 3ᵉ dose de paracétamol en moins de 2 minutes est un **surdosage** : la patiente perd 10 PV.
 
 ## Règles du jeu
 
@@ -83,20 +96,28 @@ La réanimation stoppe aussi l'étouffement, remonte les PV et l'hydratation à 
 
 ### Évolution automatique (toutes les 15 secondes)
 
-- L'hydratation baisse de 1 (de 2 si la patiente est sédatée).
+- L'hydratation baisse de 1, et de 1 de plus si la patiente est sédatée ou en hyperthermie (39 °C ou plus).
 - La patiente perd 1 PV. Si elle est intubée, elle en regagne 1 à la place.
 - La température revient vers 37 °C de 0,1 °C.
 - En cas d'étouffement, il y a 30 % de risque d'arrêt cardiaque.
-- À 0 % d'hydratation, elle perd 3 PV supplémentaires.
+- Chaque problème non soigné lui fait perdre **1 PV de plus** : fièvre (38 °C ou plus), éruption cutanée, anasarque, hydratation à 25 % ou moins. À 0 % d'hydratation, c'est 3 PV au lieu de 1.
 - À 0 PV, la patiente fait un arrêt cardiaque.
 - Il y a 2 % de chance qu'une éruption cutanée apparaisse.
 - Sous 38 °C, il y a 3 % de chance d'une poussée de fièvre (+2,5 °C).
 
-Pendant un arrêt cardiaque, l'évolution est figée jusqu'à la réanimation.
+Pendant un arrêt cardiaque, l'évolution est figée jusqu'à la réanimation ou au décès.
+
+### Arrêt cardiaque et décès
+
+À l'arrêt cardiaque, le chat a **60 secondes** pour réanimer la patiente avec 3 `!mace` de viewers différents. Le statut affiche le nombre de massages et le temps restant.
+
+Sans réanimation à temps, la patiente meurt : le journal indique combien de temps elle a été soignée et le record. Une nouvelle patiente arrive 30 secondes plus tard ; les commandes sont ignorées d'ici là.
+
+Le record est gardé par le navigateur de la source OBS. Il repart de zéro si ce stockage n'est pas disponible.
 
 ### Intubation
 
-Une patiente intubée ne peut ni manger ni boire : il faut l'hydrater avec `!perfusion`. Elle regagne 1 PV toutes les 15 secondes et peut être extubée une fois réveillée et remontée à 50 PV.
+Une patiente intubée ne peut ni manger ni boire : il faut l'hydrater avec `!perfusion`, qui lui est réservée. Elle regagne 1 PV toutes les 15 secondes et peut être extubée une fois réveillée et remontée à 50 PV.
 
 ### Anasarque (surcharge hydrique)
 
@@ -108,7 +129,8 @@ Quand plusieurs problèmes se cumulent, l'écran affiche le plus grave, dans cet
 
 | Priorité | Condition                          | Statut                    | Critique |
 |----------|------------------------------------|---------------------------|----------|
-| 1        | Arrêt cardiaque                    | ARRÊT CARDIAQUE           | Oui      |
+| 0        | Décès                              | DÉCÉDÉE — suivante 30 s   | Oui      |
+| 1        | Arrêt cardiaque                    | ARRÊT — !mace 1/3 · 45 s  | Oui      |
 | 2        | Étouffement                        | ÉTOUFFEMENT — !heimlich   | Oui      |
 | 3        | Intubée et sédatée                 | Intubée et sédatée        |          |
 | 3        | Intubée                            | Intubée et éveillée       |          |
@@ -134,7 +156,7 @@ Quand plusieurs problèmes se cumulent, l'écran affiche le plus grave, dans cet
 | Lune         | `!hypnovel` `!reveiller`              | Patiente sédatée                     | —                          |
 | Cœur         | `!mace`                               | Arrêt cardiaque                      | Arrêt cardiaque            |
 
-Pendant un arrêt cardiaque, seule l'icône de réanimation s'allume.
+Pendant un arrêt cardiaque, seule l'icône de réanimation s'allume. Après le décès, toutes les icônes s'éteignent.
 
 ## Personnalisation
 
@@ -144,7 +166,13 @@ Tout se règle en haut de `so.js` :
 - `HYDRO_MAX` : hydratation maximale (200).
 - `HYDRO_CASE` : pourcentage d'hydratation représenté par un segment (10).
 - `ANASARQUE_SEUIL` / `ANASARQUE_SORTIE` : seuils d'apparition (150) et de disparition (120) de l'anasarque.
-- `THERMO_MIN` / `THERMO_MAX` : bas (35) et haut (42) du thermomètre.- `COMMANDS` : liste des commandes et de leurs alias.
+- `THERMO_MIN` / `THERMO_MAX` : bas (35) et haut (42) du thermomètre.
+- `ARRET_DELAI` : secondes laissées au chat pour réanimer la patiente avant le décès (60).
+- `MACE_REQUIS` : nombre de viewers différents qui doivent taper `!mace` (3). Avec 1, un seul suffit.
+- `DECES_DUREE` : secondes avant l'arrivée d'une nouvelle patiente (30).
+- `RECHARGES` : recharge de chaque soin, en secondes (nourriture et eau 20, paracétamol et diurétique 30).
+- `SURDOSE_DOSES` / `SURDOSE_FENETRE` / `SURDOSE_PV` : 3 doses de paracétamol en 120 secondes font perdre 10 PV.
+- `COMMANDS` : liste des commandes et de leurs alias.
 
 Plus bas dans `so.js` :
 
@@ -154,7 +182,7 @@ Plus bas dans `so.js` :
 
 Les 4 teintes de l'écran LCD se règlent dans `so.css` (`--lcd-fond`, `--lcd-encre`…) et dans le filtre `lcd-palette` de `so.html`.
 
-La fréquence de l'évolution automatique est fixée à la fin du fichier : `setInterval(gameTick, 15000)` (en millisecondes).
+La fréquence de l'évolution automatique est fixée à la fin du fichier : `setInterval(gameTick, 15000)` (en millisecondes). Juste en dessous, `setInterval(clockTick, 1000)` fait avancer l'horloge de jeu, qui compte les secondes des recharges, de la réanimation et de la survie.
 
 ## Atelier : Clone n°3 de Sophie (simulateur local)
 
@@ -168,11 +196,11 @@ Ouvrez ensuite http://localhost:3003/ (pour changer de port : `PORT=3004 node at
 
 L'atelier permet de :
 
-- **simuler le chat** : envoyer n'importe quel message sous un pseudo choisi, ou cliquer sur une commande, éventuellement plusieurs fois de suite ;
-- **modifier chaque paramètre** en direct : curseurs pour la santé, l'hydratation et la température, interrupteurs pour l'anasarque, l'éruption, l'étouffement, l'intubation, la sédation et l'arrêt cardiaque. Comme l'anasarque dépend de l'hydratation, l'activer porte l'hydratation à 150 % et la désactiver la ramène à 120 %, si besoin ;
-- **contrôler le temps** : pause, vitesse ×1 à ×100, avance d'un ou dix tours de 15 secondes ;
+- **simuler le chat** : envoyer n'importe quel message sous un pseudo choisi, ou cliquer sur une commande, éventuellement plusieurs fois de suite. Chaque répétition vient d'un viewer différent (Viewer, Viewer 2…), ce qui permet de tester la réanimation à plusieurs ;
+- **modifier chaque paramètre** en direct : curseurs pour la santé, l'hydratation, la température et les secondes restantes pour réanimer, interrupteurs pour l'anasarque, l'éruption, l'étouffement, l'intubation, la sédation, l'arrêt cardiaque et le décès. Comme l'anasarque dépend de l'hydratation, l'activer porte l'hydratation à 150 % et la désactiver la ramène à 120 %, si besoin ;
+- **contrôler le temps** : pause, vitesse ×1 à ×100, avance d'un ou dix tours de 15 secondes. Les recharges et le délai de réanimation suivent ce temps simulé ;
 - **forcer le hasard** : tout déclencher (étouffement en mangeant, éruption, fièvre…) ou rien ;
-- **charger un scénario** : intubée à 35 PV, poussée de fièvre, bord de l'anasarque, arrêt cardiaque… ;
+- **charger un scénario** : intubée à 35 PV, poussée de fièvre, bord de l'anasarque, arrêt cardiaque, arrêt à 10 secondes du décès… ;
 - **suivre un journal complet** : messages du chat, messages du widget, changements de statut et erreurs JavaScript avec leur ligne dans `so.js`.
 
 Les commandes et les paramètres sont lus directement dans `so.js` : un alias ou un champ ajouté apparaît automatiquement. Le widget se recharge tout seul dès qu'un des trois fichiers est enregistré.

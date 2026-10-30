@@ -26,6 +26,20 @@ const ANASARQUE_SORTIE = 120;
 const THERMO_MIN = 35;
 const THERMO_MAX = 42;
 
+// Urgences, recharges et surdosage, en secondes de jeu.
+const ARRET_DELAI = 60;
+const MACE_REQUIS = 3;
+const DECES_DUREE = 30;
+const RECHARGES = {
+  nourriture: 20,
+  eau: 20,
+  doliprane: 30,
+  diuretique: 30
+};
+const SURDOSE_DOSES = 3;
+const SURDOSE_FENETRE = 120;
+const SURDOSE_PV = 10;
+
 // ==========================================
 // ÉTAT DE LA PATIENTE
 // ==========================================
@@ -39,10 +53,26 @@ const state = {
   ettouffement: false,
   intubee: false,
   sedatee: false,
-  arret: false
+  arret: false,
+  delaiArret: ARRET_DELAI,
+  decedee: false
+};
+
+const ETAT_INITIAL = { ...state };
+
+// Déroulement de la partie, compté en secondes de jeu.
+const game = {
+  clock: 0,
+  survival: 0,
+  record: readRecord(),
+  deathTime: 0,
+  cprUsers: [],
+  cooldowns: {},
+  doses: []
 };
 
 let gameInterval = null;
+let clockInterval = null;
 
 // ==========================================
 // COMMANDES ET ALIAS
@@ -150,6 +180,67 @@ function showLog(message) {
 
   while (log.children.length > 6) {
     log.removeChild(log.lastChild);
+  }
+}
+
+// ==========================================
+// RECHARGES ET SURDOSAGE
+// ==========================================
+
+// Une recharge est commune à tout le chat : le premier viewer
+// refusé est prévenu, les suivants sont ignorés sans message.
+function isOnCooldown(type, message) {
+  const cooldown = game.cooldowns[type];
+
+  if (!cooldown || game.clock >= cooldown.end) return false;
+
+  if (!cooldown.warned) {
+    cooldown.warned = true;
+    showLog("⏳ " + message + " (encore " + (cooldown.end - game.clock) + " s)");
+  }
+
+  return true;
+}
+
+function startCooldown(type) {
+  game.cooldowns[type] = { end: game.clock + RECHARGES[type], warned: false };
+}
+
+// Renvoie true si cette dose de paracétamol est un surdosage.
+function addDose() {
+  game.doses = game.doses.filter((time) => game.clock - time < SURDOSE_FENETRE);
+  game.doses.push(game.clock);
+
+  return game.doses.length >= SURDOSE_DOSES;
+}
+
+// ==========================================
+// DURÉE DE SURVIE ET RECORD
+// ==========================================
+
+function formatDuration(seconds) {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+
+  if (hours) return hours + " h " + String(minutes).padStart(2, "0");
+  if (minutes) return minutes + " min";
+  return seconds + " s";
+}
+
+// Le record est gardé par le navigateur (la source OBS) quand c'est possible.
+function readRecord() {
+  try {
+    return Number(localStorage.getItem("patiente-record")) || 0;
+  } catch (error) {
+    return 0;
+  }
+}
+
+function saveRecord() {
+  try {
+    localStorage.setItem("patiente-record", String(game.record));
+  } catch (error) {
+    // Pas de stockage : le record repart de zéro au prochain chargement.
   }
 }
 
@@ -374,8 +465,9 @@ function buildLcdIcons() {
 
 function updateLcdIcons(statusClass) {
   for (const icon of LCD_ICONS) {
-    // Pendant un arrêt cardiaque, seule la réanimation compte.
-    const active = !state.arret || icon.id === "cpr";
+    // Pendant un arrêt cardiaque, seule la réanimation compte ;
+    // après le décès, toutes les icônes s'éteignent.
+    const active = !state.decedee && (!state.arret || icon.id === "cpr");
 
     toggleClass("lcd-icon-" + icon.id, "on", active && icon.on());
     toggleClass("lcd-icon-" + icon.id, "alerte", active && icon.alert());
@@ -597,9 +689,19 @@ function updatePatient() {
   let imageUrl = IMAGES.TOP;
   let statusClass = "";
 
+  // PRIORITÉ 0 : DÉCÈS
+  // Textes courts : l'écran affiche environ 25 caractères.
+  if (state.decedee) {
+    statusText = "💀 DÉCÉDÉE — suivante " +
+      Math.max(0, DECES_DUREE - game.deathTime) + " s";
+    imageUrl = IMAGES.ARRET_ASYSTOLIE;
+    statusClass = "critical";
+  }
+
   // PRIORITÉ 1 : ARRÊT CARDIAQUE
-  if (state.arret) {
-    statusText = "🚨 ARRÊT CARDIAQUE";
+  else if (state.arret) {
+    statusText = "🚨 ARRÊT — !mace " +
+      game.cprUsers.length + "/" + MACE_REQUIS + " · " + state.delaiArret + " s";
     imageUrl = IMAGES.ARRET_ASYSTOLIE;
     statusClass = "critical";
   }
@@ -708,20 +810,117 @@ function triggerArret(reason) {
   updatePatient();
 }
 
+function reanimate() {
+  state.arret = false;
+  state.ettouffement = false;
+  state.hp = Math.max(30, state.hp);
+  state.hydro = Math.max(30, state.hydro);
+  state.temp = Math.max(37, Math.min(38, state.temp));
+  state.delaiArret = ARRET_DELAI;
+  game.cprUsers = [];
+}
+
+// ==========================================
+// DÉCÈS ET NOUVELLE PATIENTE
+// ==========================================
+
+function declareDeath() {
+  state.decedee = true;
+  state.arret = true;
+  game.deathTime = 0;
+  game.record = Math.max(game.record, game.survival);
+  saveRecord();
+
+  showLog(
+    "💀 La patiente est décédée après " + formatDuration(game.survival) +
+    " de soins. Record : " + formatDuration(game.record) + "."
+  );
+
+  updatePatient();
+}
+
+function newPatient() {
+  Object.assign(state, ETAT_INITIAL);
+  game.survival = 0;
+  game.deathTime = 0;
+  game.cprUsers = [];
+  game.cooldowns = {};
+  game.doses = [];
+
+  showLog("🏥 Une nouvelle patiente arrive : prenez-en soin !");
+  updatePatient();
+}
+
+// ==========================================
+// HORLOGE DE JEU : TOUTES LES SECONDES
+// ==========================================
+
+// Compte la survie, les recharges et le délai pour réanimer.
+function clockTick() {
+  game.clock++;
+
+  if (state.decedee) {
+    game.deathTime++;
+
+    if (game.deathTime >= DECES_DUREE) {
+      newPatient();
+    } else {
+      updatePatient();
+    }
+
+    return;
+  }
+
+  game.deathTime = 0;
+  game.survival++;
+
+  if (!state.arret) {
+    state.delaiArret = ARRET_DELAI;
+    game.cprUsers = [];
+    return;
+  }
+
+  state.delaiArret = Math.max(0, state.delaiArret - 1);
+
+  if (state.delaiArret <= 0) {
+    declareDeath();
+  } else {
+    updatePatient();
+  }
+}
+
 // ==========================================
 // ÉVOLUTION AUTOMATIQUE : TOUTES LES 15 S
 // ==========================================
 
+// PV perdus en plus à chaque tour, un par problème non soigné.
+function symptomLoss() {
+  let loss = 0;
+
+  if (state.temp >= 38) loss += 1;
+  if (state.eruption) loss += 1;
+  if (state.anasarque) loss += 1;
+
+  if (state.hydro <= 0) {
+    loss += 3;
+  } else if (state.hydro <= 25) {
+    loss += 1;
+  }
+
+  return loss;
+}
+
 function gameTick() {
-  if (state.arret) {
+  if (state.arret || state.decedee) {
     updatePatient();
     return;
   }
 
-  // Diminution naturelle de l'hydratation.
+  // Diminution naturelle de l'hydratation, plus rapide
+  // sous sédation et en hyperthermie.
   state.hydro = Math.max(
     0,
-    state.hydro - (state.sedatee ? 2 : 1)
+    state.hydro - (state.sedatee ? 2 : 1) - (state.temp >= 39 ? 1 : 0)
   );
 
   // Perte progressive de santé, récupération sous intubation.
@@ -744,10 +943,7 @@ function gameTick() {
     return;
   }
 
-  // Une déshydratation extrême fait perdre des PV.
-  if (state.hydro <= 0) {
-    state.hp = Math.max(0, state.hp - 3);
-  }
+  state.hp = Math.max(0, state.hp - symptomLoss());
 
   if (state.hp <= 0) {
     triggerArret("La patiente n'a plus de points de vie !");
@@ -797,6 +993,9 @@ window.addEventListener("onEventReceived", function (obj) {
 
   if (!message.startsWith("!")) return;
 
+  // Plus aucun soin possible : une nouvelle patiente va arriver.
+  if (state.decedee) return;
+
   flashCommandIcon(message);
 
   // ========================================
@@ -817,31 +1016,35 @@ window.addEventListener("onEventReceived", function (obj) {
       showLog("🫁 " + user + " : patiente intubée, pas de nourriture !");
     }
 
-    else if (Math.random() < 1 / 15) {
-      state.ettouffement = true;
+    else if (!isOnCooldown("nourriture", "La patiente digère encore")) {
+      startCooldown("nourriture");
 
-      if (matchesCommand(message, "sandwich")) {
-        showLog("🥪😱 " + user + " donne un sandwich : ÉTOUFFEMENT !");
-      } else if (matchesCommand(message, "cacahuetes")) {
-        showLog("🥜😱 " + user + " donne des cacahuètes : ÉTOUFFEMENT !");
-      } else {
-        showLog("🍎😱 " + user + " donne à manger : ÉTOUFFEMENT !");
+      if (Math.random() < 1 / 15) {
+        state.ettouffement = true;
+
+        if (matchesCommand(message, "sandwich")) {
+          showLog("🥪😱 " + user + " donne un sandwich : ÉTOUFFEMENT !");
+        } else if (matchesCommand(message, "cacahuetes")) {
+          showLog("🥜😱 " + user + " donne des cacahuètes : ÉTOUFFEMENT !");
+        } else {
+          showLog("🍎😱 " + user + " donne à manger : ÉTOUFFEMENT !");
+        }
       }
-    }
 
-    else if (matchesCommand(message, "sandwich")) {
-      state.hp = Math.min(100, state.hp + 10);
-      showLog("🥪 " + user + " offre un sandwich : +10 PV !");
-    }
+      else if (matchesCommand(message, "sandwich")) {
+        state.hp = Math.min(100, state.hp + 10);
+        showLog("🥪 " + user + " offre un sandwich : +10 PV !");
+      }
 
-    else if (matchesCommand(message, "cacahuetes")) {
-      state.hp = Math.min(100, state.hp + 3);
-      showLog("🥜 " + user + " donne des cacahuètes : +3 PV !");
-    }
+      else if (matchesCommand(message, "cacahuetes")) {
+        state.hp = Math.min(100, state.hp + 3);
+        showLog("🥜 " + user + " donne des cacahuètes : +3 PV !");
+      }
 
-    else {
-      state.hp = Math.min(100, state.hp + 5);
-      showLog("🍎 " + user + " nourrit la patiente : +5 PV !");
+      else {
+        state.hp = Math.min(100, state.hp + 5);
+        showLog("🍎 " + user + " nourrit la patiente : +5 PV !");
+      }
     }
 
     updatePatient();
@@ -859,11 +1062,20 @@ window.addEventListener("onEventReceived", function (obj) {
       showLog("🚨 Réanimez la patiente en priorité !");
     }
 
-    else if (!perfusion && (state.ettouffement || state.intubee)) {
-      showLog("🚨 Impossible de faire boire la patiente ! Utilisez !perfusion");
+    else if (state.ettouffement) {
+      showLog("🚨 Elle s'étouffe : !heimlich d'abord !");
     }
 
-    else {
+    else if (perfusion && !state.intubee) {
+      showLog("ℹ️ Pas besoin de perfusion, elle peut boire : !eau");
+    }
+
+    else if (!perfusion && state.intubee) {
+      showLog("🫁 Patiente intubée : utilisez !perfusion");
+    }
+
+    else if (!isOnCooldown("eau", "La patiente vient d'être hydratée")) {
+      startCooldown("eau");
       state.hydro = Math.min(HYDRO_MAX, state.hydro + 20);
 
       showLog(
@@ -883,7 +1095,8 @@ window.addEventListener("onEventReceived", function (obj) {
       showLog("🚨 Réanimez la patiente en priorité !");
     }
 
-    else {
+    else if (!isOnCooldown("diuretique", "Diurétique déjà donné")) {
+      startCooldown("diuretique");
       state.hydro = Math.max(0, state.hydro - 20);
 
       showLog("💊 " + user + " administre un diurétique : -20 hydratation !");
@@ -899,9 +1112,16 @@ window.addEventListener("onEventReceived", function (obj) {
       showLog("🚨 Réanimez la patiente en priorité !");
     }
 
-    else {
+    else if (!isOnCooldown("doliprane", "Paracétamol déjà donné")) {
+      startCooldown("doliprane");
       state.temp = Math.max(36, state.temp - 1.5);
-      showLog("🌡️ " + user + " administre du paracétamol : -1,5 °C !");
+
+      if (addDose()) {
+        state.hp = Math.max(0, state.hp - SURDOSE_PV);
+        showLog("☠️ " + user + " : surdosage de paracétamol, -" + SURDOSE_PV + " PV !");
+      } else {
+        showLog("🌡️ " + user + " administre du paracétamol : -1,5 °C !");
+      }
     }
   }
 
@@ -1041,19 +1261,24 @@ window.addEventListener("onEventReceived", function (obj) {
   // ❤️ RÉANIMATION
   // ========================================
 
+  // Il faut MACE_REQUIS viewers différents ; un viewer
+  // qui masse une deuxième fois est ignoré.
   else if (matchesCommand(message, "cpr")) {
     if (!state.arret) {
       showLog("ℹ️ La patiente n'est pas en arrêt cardiaque !");
     }
 
-    else {
-      state.arret = false;
-      state.ettouffement = false;
-      state.hp = Math.max(30, state.hp);
-      state.hydro = Math.max(30, state.hydro);
-      state.temp = Math.max(37, Math.min(38, state.temp));
+    else if (!game.cprUsers.includes(user)) {
+      game.cprUsers.push(user);
 
-      showLog("❤️ " + user + " réanime la patiente ! Elle est stabilisée !");
+      const progress = " (" + game.cprUsers.length + "/" + MACE_REQUIS + ")";
+
+      if (game.cprUsers.length < MACE_REQUIS) {
+        showLog("❤️ " + user + " fait un massage cardiaque" + progress + " !");
+      } else {
+        reanimate();
+        showLog("❤️ " + user + " termine la réanimation" + progress + " : elle est sauvée !");
+      }
     }
   }
 
@@ -1076,4 +1301,9 @@ if (gameInterval !== null) {
   clearInterval(gameInterval);
 }
 
+if (clockInterval !== null) {
+  clearInterval(clockInterval);
+}
+
 gameInterval = setInterval(gameTick, 15000);
+clockInterval = setInterval(clockTick, 1000);
