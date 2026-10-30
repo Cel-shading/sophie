@@ -43,6 +43,14 @@ const SURDOSE_DOSES = 3;
 const SURDOSE_FENETRE = 120;
 const SURDOSE_PV = 10;
 
+// Aggravation des problèmes non soignés, en tours de 15 s.
+const AGGRAVATION_TOURS = 2;
+const AGGRAVATION_MAX = 10;
+
+// Risque, à chaque tour, qu'une patiente intubée éveillée arrache son tube.
+const AGITATION_RISQUE = 0.1;
+const AGITATION_PV = 10;
+
 // ==========================================
 // ÉTAT DE LA PATIENTE
 // ==========================================
@@ -71,7 +79,8 @@ const game = {
   deathTime: 0,
   cprUsers: [],
   cooldowns: {},
-  doses: []
+  doses: [],
+  symptoms: {}
 };
 
 let gameInterval = null;
@@ -766,6 +775,7 @@ function newPatient() {
   game.cprUsers = [];
   game.cooldowns = {};
   game.doses = [];
+  game.symptoms = {};
 
   showLog("🏥 Une nouvelle patiente arrive : prenez-en soin !");
   updatePatient();
@@ -813,21 +823,60 @@ function clockTick() {
 // ÉVOLUTION AUTOMATIQUE : TOUTES LES 15 S
 // ==========================================
 
-// PV perdus en plus à chaque tour, un par problème non soigné.
-function symptomLoss() {
-  let loss = 0;
-
-  if (state.temp >= 38) loss += 1;
-  if (state.eruption) loss += 1;
-  if (state.anasarque) loss += 1;
-
-  if (state.hydro <= 0) {
-    loss += 3;
-  } else if (state.hydro <= 25) {
-    loss += 1;
+// Problèmes qui font perdre des PV tant qu'ils ne sont pas soignés,
+// avec la perte du premier tour.
+const SYMPTOMS = {
+  fievre: { label: "La fièvre", on: () => state.temp >= 38, base: () => 1 },
+  eruption: { label: "L'éruption", on: () => state.eruption, base: () => 1 },
+  anasarque: { label: "L'anasarque", on: () => state.anasarque, base: () => 1 },
+  deshydratation: {
+    label: "La déshydratation",
+    on: () => state.hydro <= 25,
+    base: () => (state.hydro <= 0 ? 3 : 1)
   }
+};
 
-  return loss;
+// PV perdus par tour pour un problème : 1 point de plus tous les
+// AGGRAVATION_TOURS tours sans soin, jusqu'à AGGRAVATION_MAX.
+function severity(name, tours = game.symptoms[name] || 0) {
+  if (!tours) return 0;
+
+  return Math.min(
+    AGGRAVATION_MAX,
+    SYMPTOMS[name].base() + Math.floor((tours - 1) / AGGRAVATION_TOURS)
+  );
+}
+
+// L'hyperthermie assèche la patiente d'autant que la fièvre lui coûte de PV.
+function hyperthermiaLoss() {
+  return state.temp >= 39 ? severity("fievre") : 0;
+}
+
+// Compte les tours passés avec chaque problème, et prévient le chat
+// quand l'un d'eux atteint la moitié puis le maximum de l'aggravation.
+function updateSymptoms() {
+  const alerts = [Math.ceil(AGGRAVATION_MAX / 2), AGGRAVATION_MAX];
+
+  for (const [name, symptom] of Object.entries(SYMPTOMS)) {
+    const tours = symptom.on() ? (game.symptoms[name] || 0) + 1 : 0;
+    const before = severity(name);
+    const after = severity(name, tours);
+
+    game.symptoms[name] = tours;
+
+    if (after > before && alerts.includes(after)) {
+      const water = name === "fievre" ? hyperthermiaLoss() : 0;
+
+      showLog(
+        "⚠️ " + symptom.label + " s'aggrave : -" + after + " PV" +
+        (water ? " et -" + water + " hydratation" : "") + " par tour !"
+      );
+    }
+  }
+}
+
+function symptomLoss() {
+  return Object.keys(SYMPTOMS).reduce((loss, name) => loss + severity(name), 0);
 }
 
 function gameTick() {
@@ -836,16 +885,19 @@ function gameTick() {
     return;
   }
 
+  updateSymptoms();
+
   // Diminution naturelle de l'hydratation, plus rapide
   // sous sédation et en hyperthermie.
   state.hydro = Math.max(
     0,
-    state.hydro - (state.sedatee ? 2 : 1) - (state.temp >= 39 ? 1 : 0)
+    state.hydro - (state.sedatee ? 2 : 1) - hyperthermiaLoss()
   );
 
-  // Perte progressive de santé, récupération sous intubation.
+  // Perte progressive de santé, récupération sous intubation,
+  // plus rapide si la patiente est sédatée.
   if (state.intubee) {
-    state.hp = Math.min(100, state.hp + 1);
+    state.hp = Math.min(100, state.hp + (state.sedatee ? 2 : 1));
   } else {
     state.hp = Math.max(0, state.hp - 1);
   }
@@ -861,6 +913,16 @@ function gameTick() {
   if (state.ettouffement && Math.random() < 0.3) {
     triggerArret("L'étouffement a provoqué un arrêt cardiaque !");
     return;
+  }
+
+  // Intubée mais éveillée, elle peut s'agiter et arracher son tube.
+  if (state.intubee && !state.sedatee && Math.random() < AGITATION_RISQUE) {
+    state.intubee = false;
+    state.hp = Math.max(0, state.hp - AGITATION_PV);
+    showLog(
+      "😣 La patiente s'agite et arrache son tube : -" + AGITATION_PV +
+      " PV ! Sédatez-la avec !hypnovel après l'intubation."
+    );
   }
 
   state.hp = Math.max(0, state.hp - symptomLoss());
@@ -1077,7 +1139,7 @@ window.addEventListener("onEventReceived", function (obj) {
 
     else if (state.hp < 40) {
       state.intubee = true;
-      showLog("🫁 " + user + " intube la patiente !");
+      showLog("🫁 " + user + " intube la patiente : sédatez-la avec !hypnovel !");
     }
 
     else {
@@ -1104,7 +1166,7 @@ window.addEventListener("onEventReceived", function (obj) {
 
     else {
       state.sedatee = true;
-      showLog("😴 " + user + " sédate la patiente !");
+      showLog("😴 " + user + " sédate la patiente : +2 PV par tour !");
     }
   }
 
