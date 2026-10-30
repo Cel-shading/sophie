@@ -91,6 +91,8 @@ const BRIDGE = `
     commands: read(function () { return COMMANDS; }, {}),
     images: read(function () { return IMAGES; }, {}),
     hydroMax: read(function () { return HYDRO_MAX; }, 200),
+    anasarqueSeuil: read(function () { return ANASARQUE_SEUIL; }, 150),
+    anasarqueSortie: read(function () { return ANASARQUE_SORTIE; }, 120),
     update: read(function () { return updatePatient; }, function () {})
   };
   if (parent.atelierReady) parent.atelierReady();
@@ -440,7 +442,8 @@ function numberControl(container, key) {
 
   slider.addEventListener("input", () => apply(Number(slider.value), false));
   slider.addEventListener("change", () => apply(Number(slider.value), true));
-  input.addEventListener("change", () => apply(Number(input.value), true));
+  // Un champ vidé donne NaN : la valeur actuelle est gardée.
+  input.addEventListener("change", () => apply(input.valueAsNumber, true));
 
   return {
     sync(value) {
@@ -465,8 +468,13 @@ function toggleControl(container, key) {
   const box = row.querySelector("input");
 
   box.addEventListener("change", () => {
-    setStateValue(key, box.checked);
-    log("atelier", label + (box.checked ? " activé" : " désactivé"));
+    const active = box.checked;
+    const hydro = key === "anasarque" ? anasarqueHydro(active) : null;
+    if (hydro !== null) sim.bridge.state.hydro = hydro;
+
+    log("atelier", label + (active ? " activé" : " désactivé") +
+      (hydro !== null ? " (hydratation à " + hydro + " %)" : ""));
+    setStateValue(key, active);
   });
 
   return {
@@ -474,6 +482,17 @@ function toggleControl(container, key) {
       box.checked = Boolean(value);
     }
   };
+}
+
+// so.js recalcule l'anasarque d'après l'hydratation : on amène
+// l'hydratation au seuil voulu pour que l'interrupteur tienne.
+function anasarqueHydro(active) {
+  const hydro = sim.bridge.state.hydro;
+  const { anasarqueSeuil, anasarqueSortie } = sim.bridge;
+
+  if (active && hydro <= anasarqueSortie) return anasarqueSeuil;
+  if (!active && hydro >= anasarqueSeuil) return anasarqueSortie;
+  return null;
 }
 
 function setStateValue(key, value) {
