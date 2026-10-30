@@ -37,7 +37,9 @@ const RECHARGES = {
   nourriture: 20,
   eau: 20,
   doliprane: 30,
-  diuretique: 30
+  diuretique: 30,
+  // Délai avant de pouvoir réveiller une patiente qu'on vient de sédater.
+  reveil: 30
 };
 const SURDOSE_DOSES = 3;
 const SURDOSE_FENETRE = 120;
@@ -50,6 +52,9 @@ const AGGRAVATION_MAX = 10;
 // Risque, à chaque tour, qu'une patiente intubée éveillée arrache son tube.
 const AGITATION_RISQUE = 0.1;
 const AGITATION_PV = 10;
+
+// Risque d'arrêt cardiaque à chaque sédation (réaction à l'Hypnovel).
+const SEDATION_RISQUE = 0.2;
 
 // ==========================================
 // ÉTAT DE LA PATIENTE
@@ -1166,7 +1171,12 @@ window.addEventListener("onEventReceived", function (obj) {
 
     else {
       state.sedatee = true;
+      startCooldown("reveil");
       showLog("😴 " + user + " sédate la patiente : +2 PV par tour !");
+
+      if (Math.random() < SEDATION_RISQUE) {
+        triggerArret("Réaction à l'Hypnovel !");
+      }
     }
   }
 
@@ -1183,7 +1193,7 @@ window.addEventListener("onEventReceived", function (obj) {
       showLog("ℹ️ La patiente n'est pas sédatée !");
     }
 
-    else {
+    else if (!isOnCooldown("reveil", "Sous Hypnovel, impossible de la réveiller")) {
       state.sedatee = false;
       showLog("🌞 " + user + " réveille la patiente !");
     }
