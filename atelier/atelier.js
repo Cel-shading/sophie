@@ -43,10 +43,11 @@ const SCENARIOS = [
   { name: "Arrêt cardiaque (10 s restantes)", values: { hp: 0, arret: true, delaiArret: 10 } }
 ];
 
+// « jamais » vaut 1 pour que même un risque de 100 % ne se déclenche pas.
 const RANDOM_VALUES = {
   normal: null,
   toujours: 0,
-  jamais: 0.999999
+  jamais: 1
 };
 
 const JOURNAL_TYPES = {

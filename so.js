@@ -43,8 +43,13 @@ const SURDOSE_FENETRE = 120;
 const SURDOSE_PV = 10;
 
 // Aggravation des problèmes non soignés, en tours de 15 s.
-const AGGRAVATION_TOURS = 2;
+const AGGRAVATION_TOURS = 1;
 const AGGRAVATION_MAX = 10;
+
+// Risque d'éruption et de poussée de fièvre ajouté à chaque tour sans soins.
+// À 0,15, une patiente oubliée tombe forcément malade au 7e tour
+// et meurt en 5 minutes au plus.
+const MALADIE_RISQUE = 0.15;
 
 // Risque, à chaque tour, qu'une patiente intubée éveillée arrache son tube.
 const AGITATION_RISQUE = 0.1;
@@ -82,7 +87,9 @@ const game = {
   cprUsers: [],
   cooldowns: {},
   doses: [],
-  symptoms: {}
+  symptoms: {},
+  // Tours de 15 s passés sans qu'aucun soin soit donné.
+  neglect: 0
 };
 
 let gameInterval = null;
@@ -226,6 +233,20 @@ function addDose() {
   game.doses.push(game.clock);
 
   return game.doses.length >= SURDOSE_DOSES;
+}
+
+// ==========================================
+// NÉGLIGENCE
+// ==========================================
+
+// Toute commande acceptée est un soin.
+function resetNeglect() {
+  game.neglect = 0;
+}
+
+// Risque de tomber malade après un nombre de tours sans soins.
+function illnessRisk(tours = game.neglect) {
+  return Math.min(1, tours * MALADIE_RISQUE);
 }
 
 // ==========================================
@@ -832,6 +853,7 @@ function reanimate() {
   state.temp = Math.max(37, Math.min(38, state.temp));
   state.delaiArret = ARRET_DELAI;
   game.cprUsers = [];
+  resetNeglect();
 }
 
 // ==========================================
@@ -861,6 +883,7 @@ function newPatient() {
   game.cooldowns = {};
   game.doses = [];
   game.symptoms = {};
+  game.neglect = 0;
 
   showLog("🏥 Une nouvelle patiente arrive : prenez-en soin !");
   updatePatient();
@@ -1017,14 +1040,22 @@ function gameTick() {
     return;
   }
 
+  // Plus elle reste sans soins, plus elle risque de tomber malade.
+  game.neglect++;
+  const risk = illnessRisk();
+
+  if (illnessRisk(game.neglect - 1) < 0.5 && risk >= 0.5) {
+    showLog("😟 Personne ne s'occupe d'elle : elle tombe de plus en plus souvent malade !");
+  }
+
   // Apparition aléatoire d'une éruption.
-  if (!state.eruption && Math.random() < 0.02) {
+  if (!state.eruption && Math.random() < risk) {
     state.eruption = true;
     showLog("🔴 Une éruption cutanée apparaît !");
   }
 
   // Apparition aléatoire d'une poussée de fièvre.
-  if (state.temp < 38 && Math.random() < 0.03) {
+  if (state.temp < 38 && Math.random() < risk) {
     state.temp += 2.5;
     showLog("🌡️ La patiente fait une poussée de fièvre !");
   }
@@ -1085,6 +1116,7 @@ window.addEventListener("onEventReceived", function (obj) {
 
     else if (!isOnCooldown("nourriture", "La patiente digère encore")) {
       startCooldown("nourriture");
+      resetNeglect();
 
       if (Math.random() < 1 / 15) {
         state.ettouffement = true;
@@ -1143,6 +1175,7 @@ window.addEventListener("onEventReceived", function (obj) {
 
     else if (!isOnCooldown("eau", "La patiente vient d'être hydratée")) {
       startCooldown("eau");
+      resetNeglect();
       state.hydro = Math.min(HYDRO_MAX, state.hydro + 20);
 
       showLog(
@@ -1164,6 +1197,7 @@ window.addEventListener("onEventReceived", function (obj) {
 
     else if (!isOnCooldown("diuretique", "Diurétique déjà donné")) {
       startCooldown("diuretique");
+      resetNeglect();
       state.hydro = Math.max(0, state.hydro - 20);
 
       showLog("💊 " + user + " administre un diurétique : -20 hydratation !");
@@ -1181,6 +1215,7 @@ window.addEventListener("onEventReceived", function (obj) {
 
     else if (!isOnCooldown("doliprane", "Paracétamol déjà donné")) {
       startCooldown("doliprane");
+      resetNeglect();
       state.temp = Math.max(36, state.temp - 1.5);
 
       if (addDose()) {
@@ -1207,6 +1242,7 @@ window.addEventListener("onEventReceived", function (obj) {
 
     else {
       state.eruption = false;
+      resetNeglect();
       showLog("🧴 " + user + " traite l'éruption cutanée !");
     }
   }
@@ -1226,6 +1262,7 @@ window.addEventListener("onEventReceived", function (obj) {
 
     else if (state.hp < 40) {
       state.intubee = true;
+      resetNeglect();
       showLog("🫁 " + user + " intube la patiente : sédatez-la avec !hypnovel !");
     }
 
@@ -1254,6 +1291,7 @@ window.addEventListener("onEventReceived", function (obj) {
     else {
       state.sedatee = true;
       startCooldown("reveil");
+      resetNeglect();
       showLog("😴 " + user + " sédate la patiente : +2 PV par tour !");
 
       if (Math.random() < SEDATION_RISQUE) {
@@ -1277,6 +1315,7 @@ window.addEventListener("onEventReceived", function (obj) {
 
     else if (!isOnCooldown("reveil", "Sous Hypnovel, impossible de la réveiller")) {
       state.sedatee = false;
+      resetNeglect();
       showLog("🌞 " + user + " réveille la patiente !");
     }
   }
@@ -1304,6 +1343,7 @@ window.addEventListener("onEventReceived", function (obj) {
 
     else {
       state.intubee = false;
+      resetNeglect();
       showLog("🫁 " + user + " extube la patiente !");
     }
   }
@@ -1324,6 +1364,7 @@ window.addEventListener("onEventReceived", function (obj) {
     else {
       state.ettouffement = false;
       state.hp = Math.min(100, state.hp + 15);
+      resetNeglect();
 
       showLog("🆘 " + user + " réalise la manœuvre de Heimlich : +15 PV !");
     }
