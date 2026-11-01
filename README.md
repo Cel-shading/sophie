@@ -104,18 +104,30 @@ La 3ᵉ dose de paracétamol en moins de 2 minutes est un **surdosage** : la pat
 - Intubée mais éveillée, elle a 10 % de risque de s'agiter et d'arracher son tube : elle est extubée et perd 10 PV.
 - Chaque problème non soigné lui fait perdre des PV en plus : fièvre (38 °C ou plus), éruption cutanée, anasarque, hydratation à 25 % ou moins. Voir [Aggravation des problèmes](#aggravation-des-problèmes).
 - À 0 PV, la patiente fait un arrêt cardiaque.
-- Il y a 2 % de chance qu'une éruption cutanée apparaisse.
-- Sous 38 °C, il y a 3 % de chance d'une poussée de fièvre (+2,5 °C).
+- Elle peut tomber malade : une éruption cutanée peut apparaître et, sous 38 °C, une poussée de fièvre (+2,5 °C) peut survenir. Le risque grimpe à chaque tour passé sans soins : voir [Maladies et négligence](#maladies-et-négligence).
 
 Pendant un arrêt cardiaque, l'évolution est figée jusqu'à la réanimation ou au décès.
 
+### Maladies et négligence
+
+Plus le chat tarde à s'occuper d'elle, plus elle tombe souvent malade. À chaque tour, le risque d'éruption cutanée et celui de poussée de fièvre valent **15 % par tour passé sans soins** :
+
+| Sans soins | 15 s | 30 s | 45 s | 1 min | 1 min 15 | 1 min 30 | 1 min 45 et plus |
+|------------|------|------|------|-------|----------|----------|------------------|
+| Risque     | 15 % | 30 % | 45 % | 60 %  | 75 %     | 90 %     | 100 %            |
+
+- Toute commande acceptée compte comme un soin et remet le compteur à zéro : repas, eau, perfusion, médicament, crème, Heimlich, intubation, sédation, réveil, extubation ou réanimation réussie. Une commande refusée (recharge en cours, condition non remplie) ne compte pas.
+- Le journal prévient au bout d'une minute sans soins, quand le risque dépasse 50 %.
+- Une patiente oubliée meurt en **5 minutes au plus**, en 4 minutes le plus souvent : elle tombe forcément malade dans les 1 min 45, ses maladies s'aggravent à chaque tour, puis personne ne la réanime.
+- Bien soignée, elle tombe malade toutes les 40 secondes environ.
+
 ### Aggravation des problèmes
 
-Plus un problème tarde à être soigné, plus il coûte cher. Il fait perdre 1 PV au premier tour, puis 1 PV de plus toutes les 30 secondes (2 tours), jusqu'à **10 PV par tour** :
+Plus un problème tarde à être soigné, plus il coûte cher. Il fait perdre 1 PV au premier tour, puis 1 PV de plus à chaque tour (15 s), jusqu'à **10 PV par tour** au bout de 2 min 30 :
 
-| Durée sans soin | 15 s | 30 s | 45 s | 1 min | 1 min 15 | … | 2 min 15 | … | 4 min 45 et plus |
-|-----------------|------|------|------|-------|----------|---|----------|---|------------------|
-| PV perdus       | 1    | 1    | 2    | 2     | 3        | … | 5        | … | 10               |
+| Durée sans soin | 15 s | 30 s | 45 s | 1 min | 1 min 15 | … | 2 min 30 et plus |
+|-----------------|------|------|------|-------|----------|---|------------------|
+| PV perdus       | 1    | 2    | 3    | 4     | 5        | … | 10               |
 
 - À 0 % d'hydratation, la déshydratation part de 3 PV au lieu de 1.
 - En hyperthermie (39 °C ou plus), la fièvre fait aussi perdre autant d'hydratation que de PV.
@@ -182,7 +194,8 @@ Tout se règle en haut de `so.js` :
 - `DECES_DUREE` : secondes avant l'arrivée d'une nouvelle patiente (30).
 - `RECHARGES` : recharge de chaque soin, en secondes (nourriture et eau 20, paracétamol et diurétique 30). `reveil` est le délai avant de pouvoir réveiller une patiente qu'on vient de sédater (30).
 - `SURDOSE_DOSES` / `SURDOSE_FENETRE` / `SURDOSE_PV` : 3 doses de paracétamol en 120 secondes font perdre 10 PV.
-- `AGGRAVATION_TOURS` / `AGGRAVATION_MAX` : un problème non soigné coûte 1 PV de plus tous les 2 tours, jusqu'à 10 PV par tour.
+- `AGGRAVATION_TOURS` / `AGGRAVATION_MAX` : un problème non soigné coûte 1 PV de plus tous les `AGGRAVATION_TOURS` tours (1, soit à chaque tour), jusqu'à 10 PV par tour.
+- `MALADIE_RISQUE` : risque d'éruption et de poussée de fièvre ajouté à chaque tour sans soins (0,15, soit 15 %). Plus haut, les maladies sont plus fréquentes ; plus bas, elles sont plus rares, mais une patiente oubliée peut vivre plus de 5 minutes.
 - `AGITATION_RISQUE` / `AGITATION_PV` : une patiente intubée éveillée a 10 % de risque par tour d'arracher son tube, et perd alors 10 PV.
 - `SEDATION_RISQUE` : risque d'arrêt cardiaque à chaque `!hypnovel` (0,2, soit 1 sur 5).
 - `COMMANDS` : liste des commandes et de leurs alias.
